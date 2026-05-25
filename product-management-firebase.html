@@ -661,19 +661,23 @@ async function doImport() {
   }
 }
 
+// ─── HARDCODED FIREBASE CONFIG ───────────────────────────────────────────
+const HARDCODED_CONFIG = {
+  apiKey: "AIzaSyAsEbsPXHMYGZzNFoVBmPAgqkDwLZdrroM",
+  authDomain: "seneco-products.firebaseapp.com",
+  projectId: "seneco-products",
+  storageBucket: "seneco-products.firebasestorage.app",
+  messagingSenderId: "939430950583",
+  appId: "1:939430950583:web:f6a5c3917bcd447fb1ff32"
+};
+
 // ─── INIT ────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem(FB_CONFIG_KEY);
-  if (saved) {
-    try {
-      const cfg = JSON.parse(saved);
-      document.getElementById('fbConfigInput').value = JSON.stringify(cfg, null, 2);
-      initFirebase(cfg);
-    } catch(e) { openModal('fbConfigModal'); }
-  } else {
-    openModal('fbConfigModal');
-    setConnBadge('disconnected', '⚙️ 설정 필요');
-  }
+  // 하드코딩된 config 우선 사용, 없으면 localStorage 확인
+  const cfg = HARDCODED_CONFIG;
+  localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
+  document.getElementById('fbConfigInput').value = JSON.stringify(cfg, null, 2);
+  initFirebase(cfg);
 });
 </script>
 </body>
