@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENECO 제품 관리 시스템 (실시간)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --yellow: #FFD700; --yellow-dark: #E6C200; --yellow-light: #FFF8D0;
+    --gray-bg: #f5f5f5; --border: #ddd; --text: #333;
+    --red: #e74c3c; --green: #27ae60; --blue: #2980b9; --white: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background: var(--gray-bg); color: var(--text); font-size: 13px; }
+
+  /* Header */
+  .header { background: #222; color: white; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+  .header h1 span { color: var(--yellow); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .mode-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #555; color: #ccc; }
+  .mode-badge.admin { background: var(--yellow); color: #222; }
+  #adminBtn { padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; background: var(--yellow); color: #222; transition: background 0.2s; }
+  #adminBtn:hover { background: var(--yellow-dark); }
+  #adminBtn.logout { background: #555; color: white; }
+  #adminBtn.logout:hover { background: #444; }
+
+  /* Connection Badge */
+  .conn-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .conn-badge.connected { background: #d4edda; color: #155724; }
+  .conn-badge.disconnected { background: #f8d7da; color: #721c24; }
+  .conn-badge.connecting { background: #fff3cd; color: #856404; }
+
+  /* Toolbar */
+  .toolbar { background: white; padding: 14px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .toolbar input[type="text"] { padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 220px; outline: none; transition: border-color 0.2s; }
+  .toolbar input[type="text"]:focus { border-color: var(--yellow-dark); }
+  .toolbar select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: white; outline: none; cursor: pointer; }
+  .toolbar select:focus { border-color: var(--yellow-dark); }
+  .toolbar-spacer { flex: 1; }
+  .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
+  .btn-yellow { background: var(--yellow); color: #222; }
+  .btn-yellow:hover { background: var(--yellow-dark); }
+  .btn-green { background: var(--green); color: white; }
+  .btn-green:hover { background: #229954; }
+  .btn-gray { background: #e0e0e0; color: #555; }
+  .btn-gray:hover { background: #ccc; }
+  .btn-red { background: var(--red); color: white; }
+  .btn-red:hover { background: #c0392b; }
+  .btn-blue { background: var(--blue); color: white; }
+  .btn-blue:hover { background: #2471a3; }
+  .count-badge { background: var(--yellow-light); color: #555; border: 1px solid var(--yellow-dark); padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+
+  /* Table */
+  .table-wrap { padding: 18px 24px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+  thead tr { background: var(--yellow); }
+  thead th { padding: 10px; text-align: center; font-weight: 700; font-size: 12px; border-right: 1px solid rgba(0,0,0,0.08); white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th:hover { background: var(--yellow-dark); }
+  thead th .sort-icon { opacity: 0.5; margin-left: 3px; }
+  thead th.sorted .sort-icon { opacity: 1; }
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+  tbody tr:hover { background: var(--yellow-light); }
+  tbody td { padding: 9px 10px; text-align: center; vertical-align: middle; border-right: 1px solid #f5f5f5; font-size: 12px; }
+  tbody td.left { text-align: left; }
+  .new-code { font-weight: 700; color: #1a1a1a; font-size: 12px; }
+  .old-code { color: #777; font-size: 11px; }
+  .product-img { width: 52px; height: 42px; object-fit: contain; border-radius: 4px; border: 1px solid #eee; background: #fafafa; cursor: pointer; }
+  .no-img { width: 52px; height: 42px; border: 1px dashed #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 9px; background: #fafafa; }
+  .action-btns { display: flex; gap: 4px; justify-content: center; }
+  .action-btns button { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.15s; }
+  .btn-edit { background: #e8f4fd; color: var(--blue); }
+  .btn-edit:hover { background: var(--blue); color: white; }
+  .btn-del { background: #fdecea; color: var(--red); }
+  .btn-del:hover { background: var(--red); color: white; }
+  .no-data { text-align: center; padding: 50px; color: #aaa; font-size: 14px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+  .modal { background: white; border-radius: 12px; padding: 28px 32px; width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; }
+  .modal.wide { width: 700px; }
+  .modal h2 { font-size: 17px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--yellow); }
+  .modal-close { position: absolute; top: 16px; right: 20px; background: none; border: none; font-size: 22px; cursor: pointer; color: #999; line-height: 1; }
+  .modal-close:hover { color: #333; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 600; color: #555; }
+  .form-group input, .form-group select, .form-group textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--yellow-dark); }
+  .size-row { display: flex; gap: 8px; }
+  .size-row input { flex: 1; }
+  .img-preview-wrap { display: flex; align-items: center; gap: 12px; }
+  .img-placeholder { width: 80px; height: 65px; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 10px; background: #fafafa; text-align: center; line-height: 1.4; }
+  .img-upload-label { padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: #555; background: white; transition: all 0.2s; }
+  .img-upload-label:hover { background: #f0f0f0; }
+  .pwd-modal { width: 360px; text-align: center; }
+  .pwd-modal input { width: 100%; margin: 16px 0 8px; padding: 10px; font-size: 14px; text-align: center; letter-spacing: 4px; border: 2px solid var(--border); border-radius: 8px; outline: none; }
+  .pwd-modal input:focus { border-color: var(--yellow-dark); }
+  .pwd-error { color: var(--red); font-size: 12px; margin-bottom: 12px; min-height: 16px; }
+  .fb-config-area { width: 100%; height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-family: monospace; outline: none; resize: vertical; }
+  .fb-config-area:focus { border-color: var(--yellow-dark); }
+  .step-box { background: #f8f9fa; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; font-size: 13px; line-height: 1.8; }
+  .step-box code { background: #e9ecef; padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+
+  @media (max-width: 700px) {
+    .toolbar { gap: 7px; }
+    .toolbar input[type="text"] { width: 160px; }
+    .table-wrap { padding: 10px; }
+    .modal { padding: 20px; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1><span>SENECO</span> 제품 관리 시스템 <span style="font-size:13px;font-weight:400;color:#aaa;">실시간 공유</span></h1>
+  <div class="header-right">
+    <span class="conn-badge connecting" id="connBadge" onclick="openModal('fbConfigModal')" title="Firebase 설정">⏳ 연결 중...</span>
+    <span class="mode-badge" id="modeBadge">열람 모드</span>
+    <button id="adminBtn" onclick="toggleAdmin()">🔐 관리자 로그인</button>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="🔍  코드, 제품명으로 검색..." oninput="renderTable()">
+  <select id="filterMaterial" onchange="renderTable()"><option value="">원자재 전체</option></select>
+  <select id="filterPacking" onchange="renderTable()"><option value="">포장방식 전체</option></select>
+  <button class="btn btn-gray" onclick="resetFilters()">초기화</button>
+  <span class="count-badge" id="countBadge">0 개</span>
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-blue" id="importBtn" style="display:none;" onclick="document.getElementById('importFile').click()">📂 엑셀 가져오기</button>
+  <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelImport(event)">
+  <button class="btn btn-green" onclick="exportExcel()">📥 엑셀 다운로드</button>
+  <button class="btn btn-yellow" id="addBtn" style="display:none;" onclick="openAdd()">➕ 제품 추가</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th onclick="sortBy('newCode')">신규 코드 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('oldCode')">구 코드 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('vnName')">베트남명 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('koName')">한국명 <span class="sort-icon">↕</span></th>
+        <th>이미지</th>
+        <th onclick="sortBy('material')">원자재 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('surface')">표면처리 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('packing')">포장방식 <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('thick')">두께(T) <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('width')">폭(W) <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('length')">길이(L) <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('remark')">REMARK <span class="sort-icon">↕</span></th>
+        <th id="actionCol" style="display:none;">액션</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"><tr><td colspan="13" class="no-data">Firebase 연결 중...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Password Modal -->
+<div class="modal-overlay" id="pwdModal">
+  <div class="modal pwd-modal">
+    <button class="modal-close" onclick="closeModal('pwdModal')">×</button>
+    <h2>🔐 관리자 로그인</h2>
+    <input type="password" id="pwdInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')checkPwd()">
+    <div class="pwd-error" id="pwdError"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-gray" onclick="closeModal('pwdModal')">취소</button>
+      <button class="btn btn-yellow" onclick="checkPwd()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    <h2 id="editModalTitle">➕ 제품 추가</h2>
+    <input type="hidden" id="editDocId">
+    <div class="form-grid">
+      <div class="form-group"><label>신규 코드 *</label><input id="f_newCode" placeholder="KW-01-0001-OL"></div>
+      <div class="form-group"><label>구 코드</label><input id="f_oldCode" placeholder="ECO.P18-270"></div>
+      <div class="form-group full"><label>베트남어명</label><input id="f_vnName" placeholder="Cutting board..."></div>
+      <div class="form-group full"><label>한국어명</label><input id="f_koName" placeholder="도마 18T..."></div>
+      <div class="form-group"><label>원자재</label><input id="f_material" placeholder="마호가니(xa cu)"></div>
+      <div class="form-group"><label>표면처리</label><input id="f_surface" placeholder="미네랄(Mineral oil 2len)"></div>
+      <div class="form-group"><label>포장방식</label><input id="f_packing" placeholder="진공포장(VACUUM)"></div>
+      <div class="form-group"><label>두께/폭/길이 (T / W / L)</label>
+        <div class="size-row">
+          <input id="f_thick" type="number" placeholder="T">
+          <input id="f_width" type="number" placeholder="W">
+          <input id="f_length" type="number" placeholder="L">
+        </div>
+      </div>
+      <div class="form-group full"><label>REMARK</label><input id="f_remark" placeholder="비고 사항"></div>
+      <div class="form-group full">
+        <label>이미지 <span style="color:#999;font-weight:400;">(선택 · 500KB 이하 권장)</span></label>
+        <div class="img-preview-wrap">
+          <div id="imgPreview"><div class="img-placeholder">이미지<br>없음</div></div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label class="img-upload-label">📷 업로드 <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImgUpload(event)"></label>
+            <button class="btn btn-gray" style="font-size:11px;padding:5px 10px;" onclick="removeImg()">🗑 제거</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #eee;">
+      <button class="btn btn-gray" onclick="closeModal('editModal')">취소</button>
+      <button class="btn btn-yellow" onclick="saveProduct()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Excel Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal wide">
+    <button class="modal-close" onclick="closeModal('importModal')">×</button>
+    <h2>📂 엑셀 가져오기</h2>
+    <div id="importMappingContainer"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #eee;">
+      <button class="btn btn-gray" onclick="closeModal('importModal')">취소</button>
+      <button class="btn btn-yellow" onclick="doImport()">✅ 가져오기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase Config Modal -->
+<div class="modal-overlay" id="fbConfigModal">
+  <div class="modal wide">
+    <button class="modal-close" onclick="closeModal('fbConfigModal')">×</button>
+    <h2>🔥 Firebase 설정</h2>
+    <div class="step-box">
+      <strong>Firebase Console에서 config 가져오기:</strong><br>
+      1. <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → 프로젝트 선택<br>
+      2. ⚙️ 프로젝트 설정 → 내 앱 → <code>&lt;/&gt;</code> 웹 앱 선택<br>
+      3. <code>firebaseConfig = { ... }</code> 전체 복사<br>
+      4. 아래에 붙여넣기
+    </div>
+    <textarea class="fb-config-area" id="fbConfigInput" placeholder='firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  ...
+}'></textarea>
+    <p style="font-size:12px;color:#888;margin-top:8px;">※ 설정값은 이 브라우저에만 저장되며 외부로 전송되지 않습니다.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-gray" onclick="closeModal('fbConfigModal')">취소</button>
+      <button class="btn btn-yellow" onclick="saveFbConfig()">🔌 연결하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ─────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = 'seneco2024';
+const FB_CONFIG_KEY  = 'seneco_fb_products_config';
+const IMG_KEY_PREFIX = 'seneco_img_';
+const COLLECTION     = 'seneco_products';
+
+// ─── STATE ──────────────────────────────────────────────────────────────
+let products  = [];
+let isAdmin   = false;
+let sortKey   = 'newCode';
+let sortAsc   = true;
+let db        = null;
+let unsubscribe = null;
+let currentImg  = '';
+let currentDocId = '';
+
+// ─── MODAL ──────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// ─── FIREBASE INIT ──────────────────────────────────────────────────────
+function parseFbConfig(text) {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const json = match[0]
+      .replace(/\/\/.*/g, '')
+      .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+      .replace(/'/g, '"')
+      .replace(/,\s*}/g, '}');
+    return JSON.parse(json);
+  } catch(e) { return null; }
+}
+
+function saveFbConfig() {
+  const text = document.getElementById('fbConfigInput').value.trim();
+  if (!text) { alert('Firebase config를 입력하세요.'); return; }
+  const cfg = parseFbConfig(text);
+  if (!cfg || !cfg.projectId) { alert('config 형식이 올바르지 않습니다.\nfirebaseConfig = { ... } 전체를 복사해 주세요.'); return; }
+  localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
+  closeModal('fbConfigModal');
+  initFirebase(cfg);
+}
+
+function initFirebase(cfg) {
+  try {
+    if (firebase.apps.length) firebase.apps.forEach(a => a.delete());
+    firebase.initializeApp(cfg);
+    db = firebase.firestore();
+    setConnBadge('connecting', '⏳ 연결 중...');
+    startRealtimeSync();
+  } catch(e) {
+    setConnBadge('disconnected', '❌ 연결 오류');
+    console.error('Firebase init error:', e);
+  }
+}
+
+function startRealtimeSync() {
+  if (unsubscribe) unsubscribe();
+  unsubscribe = db.collection(COLLECTION)
+    .orderBy('newCode')
+    .onSnapshot(snap => {
+      products = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+      setConnBadge('connected', `✅ 실시간 연결 (${products.length}개)`);
+      buildFilters();
+      renderTable();
+    }, err => {
+      setConnBadge('disconnected', '❌ 연결 오류');
+      console.error('Firestore error:', err);
+    });
+}
+
+function setConnBadge(state, text) {
+  const el = document.getElementById('connBadge');
+  el.className = `conn-badge ${state}`;
+  el.textContent = text;
+}
+
+// ─── FIRESTORE CRUD ─────────────────────────────────────────────────────
+async function fsAdd(data) {
+  if (!db) { alert('Firebase 연결 필요'); return; }
+  await db.collection(COLLECTION).add(data);
+}
+async function fsUpdate(docId, data) {
+  if (!db) { alert('Firebase 연결 필요'); return; }
+  await db.collection(COLLECTION).doc(docId).set(data);
+}
+async function fsDelete(docId) {
+  if (!db) { alert('Firebase 연결 필요'); return; }
+  await db.collection(COLLECTION).doc(docId).delete();
+}
+async function fsBatchAdd(dataArray) {
+  if (!db) { alert('Firebase 연결 필요'); return; }
+  const BATCH_SIZE = 400;
+  for (let i = 0; i < dataArray.length; i += BATCH_SIZE) {
+    const batch = db.batch();
+    dataArray.slice(i, i + BATCH_SIZE).forEach(d => {
+      batch.set(db.collection(COLLECTION).doc(), d);
+    });
+    await batch.commit();
+  }
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────────────
+function buildFilters() {
+  const mats  = [...new Set(products.map(p => p.material).filter(Boolean))].sort();
+  const packs = [...new Set(products.map(p => p.packing).filter(Boolean))].sort();
+  const mSel  = document.getElementById('filterMaterial');
+  const pSel  = document.getElementById('filterPacking');
+  const mVal  = mSel.value, pVal = pSel.value;
+  mSel.innerHTML = '<option value="">원자재 전체</option>' + mats.map(m  => `<option value="${m}">${m}</option>`).join('');
+  pSel.innerHTML = '<option value="">포장방식 전체</option>' + packs.map(p => `<option value="${p}">${p}</option>`).join('');
+  mSel.value = mVal; pSel.value = pVal;
+}
+
+function getFiltered() {
+  const q    = document.getElementById('searchInput').value.trim().toLowerCase();
+  const mat  = document.getElementById('filterMaterial').value;
+  const pack = document.getElementById('filterPacking').value;
+  return products.filter(p => {
+    const matchQ = !q || [p.newCode, p.oldCode, p.vnName, p.koName].some(v => v && v.toLowerCase().includes(q));
+    const matchM = !mat  || p.material === mat;
+    const matchP = !pack || p.packing  === pack;
+    return matchQ && matchM && matchP;
+  });
+}
+
+function renderTable() {
+  const filtered = getFiltered().slice().sort((a, b) => {
+    let va = a[sortKey] || '', vb = b[sortKey] || '';
+    if (typeof va === 'number') return sortAsc ? va - vb : vb - va;
+    return sortAsc ? String(va).localeCompare(String(vb), 'ko') : String(vb).localeCompare(String(va), 'ko');
+  });
+  document.getElementById('countBadge').textContent = `${filtered.length} 개`;
+  const tbody = document.getElementById('tableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="13" class="no-data">${db ? '제품이 없습니다.' : 'Firebase에 연결해 주세요. 우측 상단 연결 버튼을 클릭하세요.'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(p => {
+    const imgSrc = p.img || localStorage.getItem(IMG_KEY_PREFIX + p.newCode) || '';
+    return `<tr>
+      <td class="new-code">${esc(p.newCode)}</td>
+      <td class="old-code">${esc(p.oldCode)}</td>
+      <td class="left">${esc(p.vnName)}</td>
+      <td class="left">${esc(p.koName)}</td>
+      <td>${imgSrc ? `<img class="product-img" src="${imgSrc}" onclick="zoomImg('${imgSrc}')">` : '<div class="no-img">이미지<br>없음</div>'}</td>
+      <td>${esc(p.material)}</td>
+      <td>${esc(p.surface)}</td>
+      <td>${esc(p.packing)}</td>
+      <td>${p.thick || '-'}</td>
+      <td>${p.width || '-'}</td>
+      <td>${p.length || '-'}</td>
+      <td class="left">${esc(p.remark)}</td>
+      <td style="display:${isAdmin ? 'table-cell' : 'none'};">
+        <div class="action-btns">
+          <button class="btn-edit" onclick="openEdit('${p._docId}')">✏️ 수정</button>
+          <button class="btn-del"  onclick="deleteProduct('${p._docId}','${esc(p.newCode)}')">🗑 삭제</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; }
+  renderTable();
+}
+
+function resetFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterMaterial').value = '';
+  document.getElementById('filterPacking').value  = '';
+  renderTable();
+}
+
+// ─── ADMIN ──────────────────────────────────────────────────────────────
+function toggleAdmin() {
+  if (isAdmin) { isAdmin = false; updateAdminUI(); }
+  else {
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdError').textContent = '';
+    openModal('pwdModal');
+    setTimeout(() => document.getElementById('pwdInput').focus(), 100);
+  }
+}
+function checkPwd() {
+  if (document.getElementById('pwdInput').value === ADMIN_PASSWORD) {
+    isAdmin = true; closeModal('pwdModal'); updateAdminUI();
+  } else {
+    document.getElementById('pwdError').textContent = '비밀번호가 올바르지 않습니다.';
+    document.getElementById('pwdInput').select();
+  }
+}
+function updateAdminUI() {
+  document.getElementById('modeBadge').textContent  = isAdmin ? '관리자 모드' : '열람 모드';
+  document.getElementById('modeBadge').className    = 'mode-badge' + (isAdmin ? ' admin' : '');
+  document.getElementById('adminBtn').textContent   = isAdmin ? '🔓 로그아웃' : '🔐 관리자 로그인';
+  document.getElementById('adminBtn').className     = isAdmin ? 'logout' : '';
+  document.getElementById('addBtn').style.display   = isAdmin ? 'flex' : 'none';
+  document.getElementById('importBtn').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('actionCol').style.display = isAdmin ? 'table-cell' : 'none';
+  renderTable();
+}
+
+// ─── ADD / EDIT ──────────────────────────────────────────────────────────
+function openAdd() {
+  document.getElementById('editModalTitle').textContent = '➕ 제품 추가';
+  document.getElementById('editDocId').value = '';
+  ['newCode','oldCode','vnName','koName','material','surface','packing','thick','width','length','remark'].forEach(f => document.getElementById('f_'+f).value = '');
+  currentImg = ''; currentDocId = '';
+  updateImgPreview('');
+  openModal('editModal');
+}
+function openEdit(docId) {
+  const p = products.find(x => x._docId === docId);
+  if (!p) return;
+  document.getElementById('editModalTitle').textContent = '✏️ 제품 수정';
+  document.getElementById('editDocId').value   = docId;
+  document.getElementById('f_newCode').value   = p.newCode  || '';
+  document.getElementById('f_oldCode').value   = p.oldCode  || '';
+  document.getElementById('f_vnName').value    = p.vnName   || '';
+  document.getElementById('f_koName').value    = p.koName   || '';
+  document.getElementById('f_material').value  = p.material || '';
+  document.getElementById('f_surface').value   = p.surface  || '';
+  document.getElementById('f_packing').value   = p.packing  || '';
+  document.getElementById('f_thick').value     = p.thick    || '';
+  document.getElementById('f_width').value     = p.width    || '';
+  document.getElementById('f_length').value    = p.length   || '';
+  document.getElementById('f_remark').value    = p.remark   || '';
+  currentImg = p.img || localStorage.getItem(IMG_KEY_PREFIX + p.newCode) || '';
+  currentDocId = docId;
+  updateImgPreview(currentImg);
+  openModal('editModal');
+}
+async function saveProduct() {
+  if (!db) { alert('Firebase에 먼저 연결해 주세요.'); return; }
+  const newCode = document.getElementById('f_newCode').value.trim();
+  if (!newCode) { alert('신규 코드를 입력하세요.'); return; }
+  const docId = document.getElementById('editDocId').value;
+  const prod = {
+    newCode,
+    oldCode:  document.getElementById('f_oldCode').value.trim(),
+    vnName:   document.getElementById('f_vnName').value.trim(),
+    koName:   document.getElementById('f_koName').value.trim(),
+    material: document.getElementById('f_material').value.trim(),
+    surface:  document.getElementById('f_surface').value.trim(),
+    packing:  document.getElementById('f_packing').value.trim(),
+    thick:    parseFloat(document.getElementById('f_thick').value)  || '',
+    width:    parseFloat(document.getElementById('f_width').value)  || '',
+    length:   parseFloat(document.getElementById('f_length').value) || '',
+    remark:   document.getElementById('f_remark').value.trim(),
+    img:      currentImg.length < 500000 ? currentImg : '',
+    updatedAt: new Date().toISOString().slice(0, 10),
+  };
+  if (currentImg.length >= 500000) {
+    localStorage.setItem(IMG_KEY_PREFIX + newCode, currentImg);
+  }
+  try {
+    if (docId) { await fsUpdate(docId, prod); }
+    else       { await fsAdd(prod); }
+    closeModal('editModal');
+  } catch(e) {
+    alert('저장 오류: ' + e.message);
+  }
+}
+async function deleteProduct(docId, name) {
+  if (!confirm(`"${name}" 제품을 삭제하시겠습니까?`)) return;
+  try { await fsDelete(docId); }
+  catch(e) { alert('삭제 오류: ' + e.message); }
+}
+
+// ─── IMAGE ───────────────────────────────────────────────────────────────
+function updateImgPreview(src) {
+  const el = document.getElementById('imgPreview');
+  el.innerHTML = src
+    ? `<img src="${src}" style="max-width:80px;max-height:65px;border-radius:6px;border:1px solid #eee;">`
+    : '<div class="img-placeholder">이미지<br>없음</div>';
+}
+function handleImgUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { currentImg = ev.target.result; updateImgPreview(currentImg); };
+  reader.readAsDataURL(file);
+}
+function removeImg() {
+  currentImg = ''; updateImgPreview('');
+  const inp = document.getElementById('imgInput'); if (inp) inp.value = '';
+}
+function zoomImg(src) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out;';
+  ov.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:8px;">`;
+  ov.onclick = () => document.body.removeChild(ov);
+  document.body.appendChild(ov);
+}
+
+// ─── EXPORT ──────────────────────────────────────────────────────────────
+function exportExcel() {
+  const headers = ['신규코드','구코드','베트남어명','한국어명','원자재','표면처리','포장','T','W','L','REMARK'];
+  const rows = products.map(p => [p.newCode,p.oldCode,p.vnName,p.koName,p.material,p.surface,p.packing,p.thick,p.width,p.length,p.remark]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Products');
+  XLSX.writeFile(wb, 'SENECO_제품목록.xlsx');
+}
+
+// ─── IMPORT ──────────────────────────────────────────────────────────────
+let importHeaders = [], importRows = [];
+const COL_FIELDS = [
+  {key:'newCode',label:'신규 코드'},{key:'oldCode',label:'구 코드'},
+  {key:'vnName',label:'베트남어명'},{key:'koName',label:'한국어명'},
+  {key:'material',label:'원자재'},{key:'surface',label:'표면처리'},
+  {key:'packing',label:'포장방식'},{key:'thick',label:'두께(T)'},
+  {key:'width',label:'너비(W)'},{key:'length',label:'길이(L)'},
+  {key:'remark',label:'REMARK'},
+];
+function autoMap(h) {
+  h = h.toLowerCase();
+  if (h.includes('신규')||(h.includes('코드')&&!h.includes('구'))) return 'newCode';
+  if (h.includes('구코')||h.includes('old')||h.includes('구 코')) return 'oldCode';
+  if (h.includes('vn')||h.includes('베트남')) return 'vnName';
+  if (h.includes('ko')||h.includes('한국')||h.includes('한글')) return 'koName';
+  if (h.includes('material')||h.includes('원자재')) return 'material';
+  if (h.includes('surface')||h.includes('표면')) return 'surface';
+  if (h.includes('pack')||h.includes('포장')) return 'packing';
+  if (h==='t'||h.includes('두께')||h.includes('thick')) return 'thick';
+  if (h==='w'||h.includes('너비')||h.includes('width')||h.includes('폭')) return 'width';
+  if (h==='l'||h.includes('길이')||h.includes('length')) return 'length';
+  if (h.includes('remark')||h.includes('비고')) return 'remark';
+  return '';
+}
+function handleExcelImport(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const wb   = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+    if (rows.length < 2) { alert('데이터가 없습니다.'); return; }
+    let hr = 0;
+    for (let i = 0; i < Math.min(5, rows.length); i++) { if (rows[i].some(c => c && String(c).trim())) { hr = i; break; } }
+    importHeaders = rows[hr].map((h, i) => h ? String(h).trim() : `열${i+1}`);
+    importRows    = rows.slice(hr+1).filter(r => r.some(c => c !== ''));
+    buildImportUI();
+    openModal('importModal');
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+}
+function buildImportUI() {
+  document.getElementById('importMappingContainer').innerHTML = `
+    <p style="font-size:13px;color:#666;margin-bottom:10px;">엑셀 열을 시스템 항목에 매핑하세요. (총 ${importRows.length}행)</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f5f5f5;">
+        <th style="padding:7px;border:1px solid #ddd;text-align:left;">엑셀 열</th>
+        <th style="padding:7px;border:1px solid #ddd;text-align:left;">시스템 항목</th>
+      </tr></thead>
+      <tbody>${importHeaders.map((h,i) => `<tr>
+        <td style="padding:7px;border:1px solid #ddd;">${h}</td>
+        <td style="padding:7px;border:1px solid #ddd;">
+          <select class="import-map-sel" data-col="${i}" style="width:100%;padding:4px;border:1px solid #ddd;border-radius:4px;">
+            <option value="">— 사용 안 함 —</option>
+            ${COL_FIELDS.map(f => `<option value="${f.key}"${autoMap(h)===f.key?' selected':''}>${f.label}</option>`).join('')}
+          </select>
+        </td></tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+async function doImport() {
+  if (!db) { alert('Firebase에 먼저 연결해 주세요.'); return; }
+  const sels = document.querySelectorAll('.import-map-sel');
+  const mapping = {};
+  sels.forEach(sel => { if (sel.value) mapping[sel.value] = parseInt(sel.dataset.col); });
+  if (mapping.newCode === undefined) { alert('신규 코드 열을 반드시 매핑하세요.'); return; }
+  const get    = (row, key) => mapping[key] !== undefined ? String(row[mapping[key]] || '').trim() : '';
+  const getNum = (row, key) => mapping[key] !== undefined ? (parseFloat(row[mapping[key]]) || '') : '';
+  const toAdd = [];
+  let skipped = 0;
+  importRows.forEach(row => {
+    const newCode = get(row, 'newCode');
+    if (!newCode) { skipped++; return; }
+    toAdd.push({
+      newCode, oldCode:get(row,'oldCode'), vnName:get(row,'vnName'), koName:get(row,'koName'),
+      material:get(row,'material'), surface:get(row,'surface'), packing:get(row,'packing'),
+      thick:getNum(row,'thick'), width:getNum(row,'width'), length:getNum(row,'length'),
+      remark:get(row,'remark'), img:'', updatedAt: new Date().toISOString().slice(0,10),
+    });
+  });
+  if (!toAdd.length) { alert('추가할 데이터가 없습니다.'); return; }
+  if (!confirm(`${toAdd.length}개 제품을 Firebase에 추가하시겠습니까?`)) return;
+  closeModal('importModal');
+  setConnBadge('connecting', `⏳ 업로드 중... (${toAdd.length}개)`);
+  try {
+    await fsBatchAdd(toAdd);
+    alert(`완료: ${toAdd.length}개 추가, ${skipped}개 건너뜀`);
+  } catch(e) {
+    alert('업로드 오류: ' + e.message);
+  }
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem(FB_CONFIG_KEY);
+  if (saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      document.getElementById('fbConfigInput').value = JSON.stringify(cfg, null, 2);
+      initFirebase(cfg);
+    } catch(e) { openModal('fbConfigModal'); }
+  } else {
+    openModal('fbConfigModal');
+    setConnBadge('disconnected', '⚙️ 설정 필요');
+  }
+});
+</script>
+</body>
+</html>
