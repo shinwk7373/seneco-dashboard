@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SENECO 토탈 관리</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --primary-dark: #1e40af;
+      --sidebar-bg: #1e293b;
+      --sidebar-text: #cbd5e1;
+      --bg: #f1f5f9;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+    /* LOGIN */
+    #loginScreen {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #1e293b 0%, #2563eb 100%);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .login-card {
+      background: white; border-radius: 18px; padding: 44px 40px; width: 420px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+    }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo .emoji { font-size: 48px; display: block; margin-bottom: 10px; }
+    .login-logo h1 { font-size: 22px; font-weight: 700; }
+    .login-logo p { color: var(--text-light); font-size: 13.5px; margin-top: 4px; }
+
+    /* LAYOUT */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* SIDEBAR */
+    .sidebar { width: 240px; background: var(--sidebar-bg); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+    .sidebar-header { padding: 20px 16px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-header .logo { font-size: 17px; font-weight: 700; color: white; }
+    .sidebar-header .sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .user-badge { margin: 12px 12px 4px; background: rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+    .user-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0; }
+    .user-name { font-size: 13px; font-weight: 600; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-role { font-size: 11px; color: #94a3b8; }
+    .nav-section { padding: 10px 0 4px; }
+    .nav-label { font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 16px 4px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; color: var(--sidebar-text); cursor: pointer; font-size: 13.5px; border-left: 3px solid transparent; transition: all 0.15s; }
+    .nav-item:hover { background: rgba(255,255,255,0.06); color: white; }
+    .nav-item.active { background: rgba(37,99,235,0.22); color: white; border-left-color: var(--primary); }
+    .nav-item .ni { width: 20px; text-align: center; font-size: 15px; }
+    .sidebar-footer { margin-top: auto; padding: 10px 12px 14px; border-top: 1px solid rgba(255,255,255,0.08); }
+
+    /* MAIN */
+    .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .topbar { background: white; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .topbar-title { font-size: 15px; font-weight: 600; }
+    .topbar-actions { display: flex; gap: 8px; align-items: center; }
+    .content { flex: 1; padding: 22px 24px; overflow-y: auto; }
+
+    /* CARDS */
+    .card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+    .card-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+    /* STATS */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+    .stat-card { background: white; border-radius: 12px; padding: 18px 20px; border: 1px solid var(--border); }
+    .stat-icon { font-size: 22px; margin-bottom: 8px; }
+    .stat-label { font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
+    .stat-value { font-size: 28px; font-weight: 700; }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th { background: #f8fafc; padding: 10px 14px; text-align: left; font-size: 11.5px; font-weight: 600; color: var(--text-light); border-bottom: 1px solid var(--border); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .btn-danger { background: #fee2e2; color: var(--danger); }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-warning { background: #fef3c7; color: #92400e; }
+    .btn-warning:hover { background: #fde68a; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+    .btn-ghost { background: transparent; color: var(--text-light); }
+    .btn-ghost:hover { background: #f1f5f9; }
+
+    /* FORMS */
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 13.5px; color: var(--text); outline: none; transition: border-color 0.15s; background: white; }
+    .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    select.form-control { cursor: pointer; }
+
+    /* MODAL */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 500; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; border-radius: 14px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-size: 15.5px; font-weight: 600; }
+    .modal-body { padding: 20px 24px; }
+    .modal-footer { padding: 14px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* BADGES */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 500; }
+    .badge-blue { background: #eff6ff; color: #2563eb; }
+    .badge-green { background: #f0fdf4; color: #16a34a; }
+    .badge-yellow { background: #fefce8; color: #a16207; }
+    .badge-red { background: #fef2f2; color: #dc2626; }
+    .badge-purple { background: #faf5ff; color: #7c3aed; }
+    .badge-gray { background: #f8fafc; color: #64748b; border: 1px solid var(--border); }
+
+    /* ALERTS */
+    .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .alert-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+    /* PROGRESS */
+    .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .progress-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s; }
+
+    /* ROADMAP */
+    .roadmap-phase { margin-bottom: 24px; }
+    .roadmap-phase-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .roadmap-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; background: #f8fafc; cursor: pointer; transition: background 0.15s; user-select: none; }
+    .roadmap-item:hover { background: #f1f5f9; }
+    .roadmap-item.done .roadmap-text { text-decoration: line-through; color: var(--text-light); }
+    .roadmap-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; transition: all 0.15s; }
+    .roadmap-item.done .roadmap-check { background: var(--success); border-color: var(--success); color: white; font-weight: 700; }
+    .roadmap-text { font-size: 13.5px; }
+
+    /* HISTORY */
+    .history-row { display: flex; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .history-row:last-child { border-bottom: none; }
+    .h-date { font-size: 11.5px; color: var(--text-light); white-space: nowrap; min-width: 80px; padding-top: 1px; }
+    .h-action { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .h-detail { font-size: 13px; flex: 1; }
+    .h-author { font-size: 11.5px; color: var(--text-light); white-space: nowrap; }
+
+    /* PENDING */
+    .pending-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-radius: 8px; background: #f8fafc; margin-bottom: 6px; }
+    .pending-item span { font-size: 13.5px; }
+
+    /* GRID */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* EMPTY STATE */
+    .empty-state { text-align: center; padding: 40px 24px; color: var(--text-light); }
+    .empty-state .ei { font-size: 36px; margin-bottom: 10px; }
+    .empty-state p { font-size: 14px; }
+
+    /* SENSITIVITY NOTICE */
+    .sensitive-notice { font-size: 11px; color: #dc2626; margin-left: 4px; }
+
+    /* LANG TOGGLE */
+    .lang-toggle { display: flex; gap: 3px; background: #f1f5f9; border-radius: 8px; padding: 3px; }
+    .lang-btn { padding: 4px 10px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-light); transition: all 0.15s; white-space: nowrap; font-family: inherit; }
+    .lang-btn:hover { background: #e2e8f0; color: var(--text); }
+    .lang-btn.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.12); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="emoji">🏭</span>
+      <h1>SENECO 토탈 관리</h1>
+      <p style="font-size:11.5px;color:#9ca3af;margin-top:3px;letter-spacing:0.02em;">Hệ Thống Quản Lý Tổng Hợp SENECO</p>
+      <p style="margin-top:10px;font-size:13.5px;">담당자 이름을 선택하고 PIN을 입력하세요</p>
+      <p style="font-size:12px;color:var(--text-light);margin-top:2px;">Chọn tên nhân viên và nhập mã PIN để đăng nhập</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">
+        이름 &nbsp;<span style="font-size:11px;color:var(--text-light);font-weight:400;">/ Họ và tên</span>
+      </label>
+      <select class="form-control" id="loginName">
+        <option value="">— 이름 선택 / Chọn tên —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">
+        PIN 번호 &nbsp;<span style="font-size:11px;color:var(--text-light);font-weight:400;">/ Mã PIN</span>
+      </label>
+      <input type="password" class="form-control" id="loginPin" placeholder="PIN 입력 / Nhập mã PIN" maxlength="20" />
+    </div>
+    <div id="loginError" style="color:#ef4444;font-size:12.5px;margin-bottom:10px;min-height:18px;text-align:center;"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:14px;" onclick="login()">
+      입장하기 &nbsp;/&nbsp; Đăng nhập →
+    </button>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app" style="display:none;">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">🏭 SENECO</div>
+      <div class="sub" id="sidebarSub">토탈 관리 시스템</div>
+    </div>
+
+    <div class="user-badge">
+      <div class="user-avatar" id="userAvatar">A</div>
+      <div>
+        <div class="user-name" id="sidebarName">—</div>
+        <div class="user-role" id="sidebarRole">—</div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label" id="navLabel0">메인</div>
+      <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard', this)">
+        <span class="ni">📊</span><span class="nav-text"> 대시보드</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label" id="navLabel1">관리 항목</div>
+      <div class="nav-item" data-page="purchase" onclick="navigate('purchase', this)">
+        <span class="ni">📦</span><span class="nav-text"> 구매 / 원자재</span>
+      </div>
+      <div class="nav-item" data-page="production" onclick="navigate('production', this)">
+        <span class="ni">🏭</span><span class="nav-text"> 생산</span>
+      </div>
+      <div class="nav-item" data-page="quality" onclick="navigate('quality', this)">
+        <span class="ni">✅</span><span class="nav-text"> 품질</span>
+      </div>
+      <div class="nav-item" data-page="sales" onclick="navigate('sales', this)">
+        <span class="ni">📈</span><span class="nav-text"> 영업 / 매출</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label" id="navLabel2">운영</div>
+      <div class="nav-item" data-page="roadmap" onclick="navigate('roadmap', this)">
+        <span class="ni">🗺️</span><span class="nav-text"> 로드맵</span>
+      </div>
+      <div class="nav-item" data-page="history" onclick="navigate('history', this)">
+        <span class="ni">📋</span><span class="nav-text"> 변경 이력</span>
+      </div>
+      <div class="nav-item" id="teamNav" data-page="team" onclick="navigate('team', this)" style="display:none;">
+        <span class="ni">👥</span><span class="nav-text"> 팀원 관리</span>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="nav-item" onclick="logout()" style="border-left:none;color:#94a3b8;">
+        <span class="ni">🚪</span><span class="nav-text"> 로그아웃</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="pageTitle">대시보드</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="langKo" onclick="setLang('ko')">🇰🇷 한국어</button>
+          <button class="lang-btn" id="langBi" onclick="setLang('bi')">🔄 병행</button>
+          <button class="lang-btn" id="langVn" onclick="setLang('vn')">🇻🇳 Tiếng Việt</button>
+        </div>
+        <div class="topbar-actions" id="topbarActions"></div>
+      </div>
+    </div>
+    <div class="content" id="mainContent"></div>
+  </div>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div class="modal-overlay" id="modalOverlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()" style="font-size:16px;">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// DEFAULT DATA (from SENECO_관리_LIST.md)
+// ================================================================
+const DEFAULT = {
+  items: {
+    purchase: [
+      { id:1, name:'원부자재별 매입가', assignee:'구매 담당', freq:'수시 (변경 시)', note:'업데이트 날짜 필수 기록', updated:'2026-05-24', by:'관리자', sensitive:true },
+      { id:2, name:'소모품 규격 및 단가', assignee:'구매 담당', freq:'월 1회', note:'업데이트 날짜 필수 기록', updated:'2026-05-24', by:'관리자', sensitive:true },
+      { id:3, name:'공급업체 정보', assignee:'구매 담당', freq:'변경 시', note:'업체명, 연락처, 납기 포함', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:4, name:'최소발주수량 (MOQ)', assignee:'구매 담당', freq:'변경 시', note:'', updated:'2026-05-24', by:'관리자', sensitive:false },
+    ],
+    production: [
+      { id:5, name:'생산지시서별 현황', assignee:'생산 담당', freq:'일일', note:'라인별 진행률 포함', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:6, name:'생산 공정도', assignee:'생산 담당', freq:'공정 변경 시', note:'문서 + 이미지 형태', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:7, name:'라인별 생산 실적', assignee:'생산 담당', freq:'일간 / 주간', note:'', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:8, name:'설비 가동률', assignee:'생산 담당', freq:'주간', note:'', updated:'2026-05-24', by:'관리자', sensitive:false },
+    ],
+    quality: [
+      { id:9, name:'아이템별 품질관리표', assignee:'품질 담당', freq:'생산 시마다', note:'체크리스트 형태', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:10, name:'불량률 현황', assignee:'품질 담당', freq:'주간 / 월간', note:'', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:11, name:'고객 클레임 이력', assignee:'품질 담당', freq:'발생 시', note:'', updated:'2026-05-24', by:'관리자', sensitive:false },
+    ],
+    sales: [
+      { id:12, name:'고객사별 매출 현황', assignee:'영업 담당', freq:'월간', note:'', updated:'2026-05-24', by:'관리자', sensitive:true },
+      { id:13, name:'월별 매출 현황', assignee:'영업 담당', freq:'월마감 후', note:'차트 포함 권장', updated:'2026-05-24', by:'관리자', sensitive:true },
+      { id:14, name:'수주 현황', assignee:'영업 담당', freq:'수시', note:'', updated:'2026-05-24', by:'관리자', sensitive:false },
+      { id:15, name:'미수금 현황', assignee:'영업 담당', freq:'월간', note:'', updated:'2026-05-24', by:'관리자', sensitive:true },
+    ],
+  },
+  team: [
+    { id:1, name:'관리자', role:'관리자', email:'admin@senecokr.com', pin:'0000' },
+    { id:2, name:'구매 담당자', role:'구매 담당', email:'', pin:'1111' },
+    { id:3, name:'생산/품질 담당자', role:'생산/품질 담당', email:'', pin:'2222' },
+    { id:4, name:'영업 담당자', role:'영업 담당', email:'', pin:'3333' },
+  ],
+  roadmap: {
+    phase1: [
+      { text:'관리 항목 최종 리스트 팀 전체 합의', done:false },
+      { text:'공유 워크스페이스 생성', done:false },
+      { text:'각 항목별 담당자 지정 + 열람 권한 설정', done:false },
+    ],
+    phase2: [
+      { text:'각 담당자 현재 데이터를 항목별 서식에 입력', done:false },
+      { text:'업데이트 주기 및 방법 팀 내 규칙으로 문서화', done:false },
+    ],
+    phase3: [
+      { text:'주간/월간 검토 미팅 정례화 (15~30분)', done:false },
+      { text:'누락/오류 항목 수정, 신규 항목 요청 (관리자에게)', done:false },
+      { text:'분기마다 전체 항목 점검 — 삭제/추가 반영', done:false },
+    ],
+  },
+  pending: ['재고 현황', '외주 가공 현황', '인력 현황 및 근태', '설비 점검/보수 이력', '원가 계산서'],
+  history: [{ date:'2026-05-24', action:'최초 작성', detail:'관리 시스템 초기 구성', author:'관리자' }],
+  nextId: 16,
+};
+
+// ================================================================
+// I18N
+// ================================================================
+let curLang = localStorage.getItem('seneco_lang') || 'ko';
+
+const I18N = {
+  ko: {
+    dashboard:'대시보드', purchase:'구매 / 원자재', production:'생산', quality:'품질',
+    sales:'영업 / 매출', team:'팀원 관리', roadmap:'로드맵', history:'변경 이력',
+    nav_main:'메인', nav_manage:'관리 항목', nav_ops:'운영', logout:'로그아웃',
+    sidebar_sub:'토탈 관리 시스템',
+    r_admin:'관리자', r_purchase:'구매 담당', r_prod:'생산/품질 담당', r_sales:'영업 담당',
+    btn_add_item:'+ 항목 추가', btn_add_member:'+ 팀원 추가', btn_add_pending:'+ 추가',
+    btn_edit:'수정', btn_del:'삭제', btn_save:'저장', btn_cancel:'취소',
+    btn_see_all:'전체 보기', btn_pin:'수정/PIN변경', btn_promote:'항목화', btn_clear:'초기화',
+    col_name:'항목명', col_assignee:'담당자', col_freq:'업데이트 주기',
+    col_note:'비고', col_updated:'최종 수정일', col_author:'수정자', col_action:'액션',
+    col_role:'역할', col_email:'이메일', col_perm:'권한', col_pin:'PIN',
+    lbl_total:'전체 관리 항목', lbl_team:'팀원 수', lbl_pending:'추가 예정 항목', lbl_roadmap:'로드맵 진행률',
+    lbl_cat_chart:'카테고리별 항목 수', lbl_pending_card:'추가 예정 항목', lbl_recent:'최근 변경 이력',
+    msg_view_only:'👁️ 열람 전용 — 이 카테고리의 수정 권한은 담당자에게 있습니다.',
+    msg_sensitive:'🔒 민감 정보 항목은 관리자 및 해당 담당자만 내용을 확인할 수 있습니다.',
+    msg_empty:'항목이 없습니다', msg_no_data:'이력 없음', msg_no_access:'열람 권한 없음',
+    perm_admin:'전체 수정 · 추가 · 삭제', perm_purchase:'구매 수정 · 전체 열람',
+    perm_prod:'생산·품질 수정 · 전체 열람', perm_sales:'영업 수정 · 전체 열람',
+    perm_title:'🔒 권한 운영 원칙',
+    perm1:'작성(Owner): 해당 항목 담당자만 수정 가능',
+    perm2:'열람(View): 전 팀원 열람 가능 (팀 투명성 유지)',
+    perm3:'항목 추가/삭제: 관리자만 가능',
+    perm4:'매출·단가 민감 정보 🔒: 관리자 + 해당 담당자만 열람',
+    roadmap_overall:'전체 진행률', roadmap_hint:'항목 클릭 → 완료 처리', roadmap_title:'운영 로드맵',
+    hist_col_date:'날짜', hist_col_type:'구분', hist_col_detail:'내용', hist_col_author:'작성자',
+    team_pin_notice:'🔐 팀원별 초기 PIN을 확인하고 반드시 변경해 주세요. PIN은 로그인 시 사용됩니다.',
+    phase1:'1주차 — 기반 구축', phase2:'2~3주차 — 초기 데이터 입력', phase3:'4주차 이후 — 정기 운영',
+    lbl_members:'명',
+    lbl_count_unit:'개',
+    act_add_item:'항목 추가', act_edit_item:'항목 수정', act_del_item:'항목 삭제',
+    act_add_member:'팀원 추가', act_edit_member:'팀원 수정', act_del_member:'팀원 삭제',
+    act_add_pending:'추가 예정 등록', act_del_pending:'추가 예정 제거', act_move_pending:'추가 예정 → 항목',
+    act_roadmap_done:'로드맵 완료', act_roadmap_undo:'로드맵 미완료', act_clear_history:'이력 초기화',
+    act_init:'최초 작성',
+  },
+  vn: {
+    dashboard:'Bảng điều khiển', purchase:'Mua hàng / Nguyên liệu', production:'Sản xuất',
+    quality:'Chất lượng', sales:'Kinh doanh / Doanh thu', team:'Quản lý nhân viên',
+    roadmap:'Lộ trình', history:'Lịch sử thay đổi',
+    nav_main:'Chính', nav_manage:'Mục quản lý', nav_ops:'Vận hành', logout:'Đăng xuất',
+    sidebar_sub:'Hệ thống quản lý tổng hợp',
+    r_admin:'Quản trị viên', r_purchase:'Phụ trách mua hàng', r_prod:'Phụ trách SX/CL', r_sales:'Phụ trách KD',
+    btn_add_item:'+ Thêm mục', btn_add_member:'+ Thêm NV', btn_add_pending:'+ Thêm',
+    btn_edit:'Sửa', btn_del:'Xóa', btn_save:'Lưu', btn_cancel:'Hủy',
+    btn_see_all:'Xem tất cả', btn_pin:'Sửa/Đổi PIN', btn_promote:'Chuyển mục', btn_clear:'Xóa lịch sử',
+    col_name:'Tên mục', col_assignee:'Người phụ trách', col_freq:'Chu kỳ cập nhật',
+    col_note:'Ghi chú', col_updated:'Ngày sửa cuối', col_author:'Người sửa', col_action:'Thao tác',
+    col_role:'Vai trò', col_email:'Email', col_perm:'Quyền hạn', col_pin:'PIN',
+    lbl_total:'Tổng mục quản lý', lbl_team:'Số nhân viên', lbl_pending:'Mục chờ thêm', lbl_roadmap:'Tiến độ lộ trình',
+    lbl_cat_chart:'Số mục theo danh mục', lbl_pending_card:'Mục chờ thêm', lbl_recent:'Lịch sử thay đổi gần đây',
+    msg_view_only:'👁️ Chỉ xem — Quyền chỉnh sửa thuộc về người phụ trách.',
+    msg_sensitive:'🔒 Thông tin nhạy cảm chỉ dành cho quản trị viên và người phụ trách.',
+    msg_empty:'Chưa có mục nào', msg_no_data:'Chưa có lịch sử', msg_no_access:'Không có quyền xem',
+    perm_admin:'Chỉnh sửa / Thêm / Xóa tất cả', perm_purchase:'Sửa mua hàng · Xem tất cả',
+    perm_prod:'Sửa SX/CL · Xem tất cả', perm_sales:'Sửa KD · Xem tất cả',
+    perm_title:'🔒 Nguyên tắc phân quyền',
+    perm1:'Chủ sở hữu: Chỉ người phụ trách mới được chỉnh sửa',
+    perm2:'Xem: Tất cả nhân viên (minh bạch nhóm)',
+    perm3:'Thêm/Xóa mục: Chỉ quản trị viên',
+    perm4:'Thông tin nhạy cảm 🔒: Quản trị viên + người phụ trách mới xem được',
+    roadmap_overall:'Tiến độ tổng thể', roadmap_hint:'Nhấp vào mục → Đánh dấu hoàn thành', roadmap_title:'Lộ trình vận hành',
+    hist_col_date:'Ngày', hist_col_type:'Loại', hist_col_detail:'Nội dung', hist_col_author:'Người thực hiện',
+    team_pin_notice:'🔐 Kiểm tra và thay đổi PIN ban đầu cho từng nhân viên.',
+    phase1:'Tuần 1 — Xây dựng nền tảng', phase2:'Tuần 2~3 — Nhập liệu ban đầu', phase3:'Từ tuần 4 — Vận hành định kỳ',
+    lbl_members:'người',
+    lbl_count_unit:'mục',
+    act_add_item:'Thêm mục', act_edit_item:'Sửa mục', act_del_item:'Xóa mục',
+    act_add_member:'Thêm NV', act_edit_member:'Sửa NV', act_del_member:'Xóa NV',
+    act_add_pending:'Đăng ký chờ', act_del_pending:'Xóa chờ', act_move_pending:'Chuyển thành mục',
+    act_roadmap_done:'Hoàn thành', act_roadmap_undo:'Chưa hoàn thành', act_clear_history:'Xóa lịch sử',
+    act_init:'Khởi tạo',
+  }
+};
+
+function t(key) {
+  if (curLang === 'bi') {
+    const ko = I18N.ko[key] || key;
+    const vn = I18N.vn[key];
+    if (!vn || vn === ko) return ko;
+    return `${ko} / ${vn}`;
+  }
+  return I18N[curLang]?.[key] || I18N.ko[key] || key;
+}
+
+const ROLE_KEY = {
+  '관리자':'r_admin', '구매 담당':'r_purchase',
+  '생산/품질 담당':'r_prod', '생산 담당':'r_prod', '품질 담당':'r_prod', '영업 담당':'r_sales'
+};
+const PERM_KEY = {
+  '관리자':'perm_admin', '구매 담당':'perm_purchase',
+  '생산/품질 담당':'perm_prod', '영업 담당':'perm_sales'
+};
+function tRole(role) { const k=ROLE_KEY[role]; return k ? t(k) : role; }
+function tPerm(role) { const k=PERM_KEY[role]; return k ? t(k) : '—'; }
+
+const ACTION_MAP = {
+  '항목 추가':'act_add_item','항목 수정':'act_edit_item','항목 삭제':'act_del_item',
+  '팀원 추가':'act_add_member','팀원 수정':'act_edit_member','팀원 삭제':'act_del_member',
+  '추가 예정 등록':'act_add_pending','추가 예정 제거':'act_del_pending','추가 예정 → 항목':'act_move_pending',
+  '로드맵 완료':'act_roadmap_done','로드맵 미완료':'act_roadmap_undo','이력 초기화':'act_clear_history',
+  '최초 작성':'act_init',
+};
+function tAction(action) { const k=ACTION_MAP[action]; return k ? t(k) : action; }
+
+function setLang(lang) {
+  curLang = lang;
+  localStorage.setItem('seneco_lang', lang);
+  ['langKo','langBi','langVn'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  document.getElementById({ko:'langKo',bi:'langBi',vn:'langVn'}[lang])?.classList.add('active');
+  updateLangUI();
+  navigate(curPage);
+}
+
+function updateLangUI() {
+  const el = id => document.getElementById(id);
+  if (el('sidebarSub')) el('sidebarSub').textContent = t('sidebar_sub');
+  if (el('navLabel0'))  el('navLabel0').textContent  = t('nav_main');
+  if (el('navLabel1'))  el('navLabel1').textContent  = t('nav_manage');
+  if (el('navLabel2'))  el('navLabel2').textContent  = t('nav_ops');
+  const navMap = {dashboard:t('dashboard'),purchase:t('purchase'),production:t('production'),quality:t('quality'),sales:t('sales'),team:t('team'),roadmap:t('roadmap'),history:t('history')};
+  document.querySelectorAll('.nav-item[data-page]').forEach(n => {
+    const nt = n.querySelector('.nav-text');
+    if (nt && navMap[n.dataset.page]) nt.textContent = ' ' + navMap[n.dataset.page];
+  });
+  const logoutNT = document.querySelector('.sidebar-footer .nav-text');
+  if (logoutNT) logoutNT.textContent = ' ' + t('logout');
+  if (user) el('sidebarRole').textContent = tRole(user.role);
+  el('pageTitle').textContent = (el('pageTitle').textContent.match(/^[📊📦🏭✅📈👥🗺️📋]\s*/)||[''])[0] + (t(curPage)||el('pageTitle').textContent);
+}
+
+// ================================================================
+// STATE
+// ================================================================
+let S = loadState();
+let user = null;
+let curPage = 'dashboard';
+
+function loadState() {
+  try { const v = localStorage.getItem('seneco_v2'); if(v) return JSON.parse(v); } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
+function save() { localStorage.setItem('seneco_v2', JSON.stringify(S)); }
+
+// ================================================================
+// AUTH
+// ================================================================
+const ROLE_VN = {
+  '관리자':          'Quản lý (Giám đốc)',
+  '구매 담당':       'Phụ trách mua hàng',
+  '생산/품질 담당':  'Phụ trách sản xuất / CL',
+  '영업 담당':       'Phụ trách kinh doanh',
+};
+
+function populateLoginDropdown() {
+  const sel = document.getElementById('loginName');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— 이름 선택 / Chọn tên —</option>';
+  S.team.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = `${m.name}  (${m.role} / ${ROLE_VN[m.role]||m.role})`;
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+function login() {
+  const name   = document.getElementById('loginName').value;
+  const pin    = document.getElementById('loginPin').value.trim();
+  const errEl  = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!name) { errEl.textContent = '이름을 선택해주세요 / Vui lòng chọn tên'; return; }
+  if (!pin)  { errEl.textContent = 'PIN을 입력해주세요 / Vui lòng nhập mã PIN'; return; }
+  const member = S.team.find(m => m.name === name);
+  if (!member) { errEl.textContent = '승인되지 않은 사용자입니다'; return; }
+  if ((member.pin || '') !== pin) { errEl.textContent = 'PIN이 올바르지 않습니다 / Mã PIN không đúng'; return; }
+  user = { name: member.name, role: member.role };
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+  document.getElementById('sidebarName').textContent = name;
+  document.getElementById('sidebarRole').textContent = `${member.role} / ${ROLE_VN[member.role]||member.role}`;
+  document.getElementById('teamNav').style.display = member.role === '관리자' ? 'flex' : 'none';
+  navigate('dashboard');
+}
+function logout() {
+  user = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginName').value = '';
+  document.getElementById('loginPin').value = '';
+  document.getElementById('loginError').textContent = '';
+}
+document.getElementById('loginPin').addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+
+// ================================================================
+// PERMISSIONS
+// ================================================================
+const CAT_ROLE = { purchase:'구매 담당', production:'생산/품질 담당', quality:'생산/품질 담당', sales:'영업 담당' };
+function canEdit(cat) { return user?.role === '관리자' || CAT_ROLE[cat] === user?.role; }
+function isAdmin() { return user?.role === '관리자'; }
+// Sensitive items visible to: admin, or the category owner
+function canSeeSensitive(cat) { return user?.role === '관리자' || CAT_ROLE[cat] === user?.role; }
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+const PAGE_TITLES = {
+  dashboard:'대시보드', purchase:'📦 구매 / 원자재', production:'🏭 생산',
+  quality:'✅ 품질', sales:'📈 영업 / 매출', team:'👥 팀원 관리',
+  roadmap:'🗺️ 로드맵', history:'📋 변경 이력',
+};
+function navigate(page, el) {
+  if (page === 'team' && !isAdmin()) return;
+  curPage = page;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else { const n = document.querySelector(`[data-page="${page}"]`); if(n) n.classList.add('active'); }
+  const _icons = {purchase:'📦 ',production:'🏭 ',quality:'✅ ',sales:'📈 ',team:'👥 ',roadmap:'🗺️ ',history:'📋 '};
+  document.getElementById('pageTitle').textContent = (_icons[page]||'') + t(page);
+  document.getElementById('topbarActions').innerHTML = '';
+  const r = { dashboard:renderDashboard, purchase:()=>renderCat('purchase','구매 / 원자재','📦'), production:()=>renderCat('production','생산','🏭'), quality:()=>renderCat('quality','품질','✅'), sales:()=>renderCat('sales','영업 / 매출','📈'), team:renderTeam, roadmap:renderRoadmap, history:renderHistory };
+  if (r[page]) r[page]();
+}
+
+// ================================================================
+// DASHBOARD
+// ================================================================
+function renderDashboard() {
+  const total = Object.values(S.items).reduce((s,a)=>s+a.length,0);
+  const allRM = [...S.roadmap.phase1,...S.roadmap.phase2,...S.roadmap.phase3];
+  const done = allRM.filter(i=>i.done).length;
+  const pct = total===0?0:Math.round(done/allRM.length*100);
+  document.getElementById('mainContent').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">${t('lbl_total')}</div><div class="stat-value">${total}</div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">${t('lbl_team')}</div><div class="stat-value">${S.team.length}</div></div>
+      <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-label">${t('lbl_pending')}</div><div class="stat-value">${S.pending.length}</div></div>
+      <div class="stat-card"><div class="stat-icon">🗺️</div><div class="stat-label">${t('lbl_roadmap')}</div><div class="stat-value">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-header"><div class="card-title">${t('lbl_cat_chart')}</div></div>
+        <div style="padding:16px 20px;">
+          ${catBar('📦 '+t('purchase'),S.items.purchase.length,total,'#2563eb')}
+          ${catBar('🏭 '+t('production'),S.items.production.length,total,'#d97706')}
+          ${catBar('✅ '+t('quality'),S.items.quality.length,total,'#16a34a')}
+          ${catBar('📈 '+t('sales'),S.items.sales.length,total,'#9333ea')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">${t('lbl_pending_card')}</div>${isAdmin()?`<button class="btn btn-sm btn-primary" onclick="addPendingModal()">${t('btn_add_pending')}</button>`:''}</div>
+        <div style="padding:10px 14px;">
+          ${S.pending.length===0?`<div class="empty-state"><div class="ei">📭</div><p>${t('msg_empty')}</p></div>`:
+            S.pending.map((p,i)=>`<div class="pending-item"><span>⏳ ${p}</span>${isAdmin()?`<div style="display:flex;gap:5px;"><button class="btn btn-sm btn-warning" onclick="movePending(${i})">${t('btn_promote')}</button><button class="btn btn-sm btn-danger" onclick="deletePending(${i})">✕</button></div>`:''}</div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">${t('lbl_recent')}</div><button class="btn btn-sm btn-secondary" onclick="navigate('history')">${t('btn_see_all')}</button></div>
+      <div style="padding:4px 20px;">
+        ${[...S.history].reverse().slice(0,5).map(h=>`<div class="history-row"><div class="h-date">${h.date}</div><div class="h-action"><span class="badge badge-gray">${tAction(h.action)}</span></div><div class="h-detail">${h.detail}</div><div class="h-author">${h.author}</div></div>`).join('')}
+      </div>
+    </div>`;
+}
+function catBar(label,cnt,total,color) {
+  const pct=total>0?Math.round(cnt/total*100):0;
+  return `<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:13px;">${label}</span><span style="font-size:13px;font-weight:600;">${cnt}${t('lbl_count_unit')}</span></div><div class="progress-bar"><div style="height:100%;background:${color};border-radius:3px;width:${pct}%;transition:width 0.3s;"></div></div></div>`;
+}
+
+// ================================================================
+// CATEGORY PAGE
+// ================================================================
+function renderCat(cat, label, icon) {
+  const items = S.items[cat]||[];
+  const ed = canEdit(cat);
+  const sens = canSeeSensitive(cat);
+  let html = '';
+  if (!ed) html += `<div class="alert alert-info">${t('msg_view_only')}</div>`;
+  const rows = items.map(it => {
+    const isSens = it.sensitive && !sens;
+    return `<tr>
+      <td><strong>${it.name}</strong>${it.sensitive?`<span class="sensitive-notice">🔒</span>`:''}</td>
+      <td><span class="badge badge-blue">${tRole(it.assignee)}</span></td>
+      <td>${it.freq}</td>
+      <td style="font-size:12.5px;color:var(--text-light);">${isSens?`<em style="color:#dc2626;">${t('msg_no_access')}</em>`:it.note||'—'}</td>
+      <td style="font-size:12px;color:var(--text-light);">${it.updated}</td>
+      <td style="font-size:12px;color:var(--text-light);">${it.by}</td>
+      <td style="white-space:nowrap;">
+        ${ed?`<button class="btn btn-sm btn-secondary" onclick="editItemModal('${cat}',${it.id})">${t('btn_edit')}</button>`:''}
+        ${isAdmin()?`<button class="btn btn-sm btn-danger" onclick="deleteItem('${cat}',${it.id})">${t('btn_del')}</button>`:''}
+        ${!ed&&!isAdmin()?'<span style="color:var(--text-light);font-size:12px;">—</span>':''}
+      </td>
+    </tr>`;
+  }).join('');
+  html += `<div class="card">
+    <div class="card-header">
+      <div class="card-title">${icon} ${t(cat)} <span class="badge badge-gray">${items.length}${t('lbl_count_unit')}</span></div>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="addItemModal('${cat}')">${t('btn_add_item')}</button>`:''}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>${t('col_name')}</th><th>${t('col_assignee')}</th><th>${t('col_freq')}</th><th>${t('col_note')}</th><th>${t('col_updated')}</th><th>${t('col_author')}</th><th>${t('col_action')}</th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="7"><div class="empty-state"><div class="ei">📭</div><p>${t('msg_empty')}</p></div></td></tr>`}</tbody>
+      </table>
+    </div>
+  </div>`;
+  if (!sens && items.some(i=>i.sensitive)) {
+    html += `<div class="alert alert-warning" style="margin-top:12px;">${t('msg_sensitive')}</div>`;
+  }
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+// ================================================================
+// ITEM CRUD
+// ================================================================
+function addItemModal(cat) {
+  openModal('항목 추가', `
+    <div class="form-group"><label class="form-label">항목명 *</label><input class="form-control" id="f_name" placeholder="항목명"/></div>
+    <div class="form-group"><label class="form-label">담당자</label><input class="form-control" id="f_ass" placeholder="담당자 이름"/></div>
+    <div class="form-group"><label class="form-label">업데이트 주기</label><input class="form-control" id="f_freq" placeholder="예: 월 1회, 수시"/></div>
+    <div class="form-group"><label class="form-label">비고</label><input class="form-control" id="f_note" placeholder="추가 설명 (선택)"/></div>
+    <div class="form-group"><label class="form-label">민감 정보 여부</label><select class="form-control" id="f_sens"><option value="false">일반</option><option value="true">민감 정보 🔒</option></select></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">취소</button>
+     <button class="btn btn-primary" onclick="doAddItem('${cat}')">추가</button>`);
+}
+function doAddItem(cat) {
+  const name = document.getElementById('f_name').value.trim();
+  if (!name) { alert('항목명을 입력하세요'); return; }
+  const today = todayStr();
+  S.items[cat].push({ id:S.nextId++, name, assignee:document.getElementById('f_ass').value.trim()||'—', freq:document.getElementById('f_freq').value.trim()||'—', note:document.getElementById('f_note').value.trim(), updated:today, by:user.name, sensitive:document.getElementById('f_sens').value==='true' });
+  log('항목 추가', `"${name}" (${catLabel(cat)})`, user.name);
+  save(); closeModal(); navigate(cat);
+}
+function editItemModal(cat, id) {
+  const it = S.items[cat].find(i=>i.id===id); if(!it) return;
+  openModal('항목 수정', `
+    <div class="form-group"><label class="form-label">항목명 *</label><input class="form-control" id="f_name" value="${esc(it.name)}"/></div>
+    <div class="form-group"><label class="form-label">담당자</label><input class="form-control" id="f_ass" value="${esc(it.assignee)}"/></div>
+    <div class="form-group"><label class="form-label">업데이트 주기</label><input class="form-control" id="f_freq" value="${esc(it.freq)}"/></div>
+    <div class="form-group"><label class="form-label">비고</label><input class="form-control" id="f_note" value="${esc(it.note)}"/></div>
+    <div class="form-group"><label class="form-label">민감 정보</label><select class="form-control" id="f_sens"><option value="false"${!it.sensitive?' selected':''}>일반</option><option value="true"${it.sensitive?' selected':''}>민감 정보 🔒</option></select></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">취소</button>
+     <button class="btn btn-primary" onclick="doEditItem('${cat}',${id})">저장</button>`);
+}
+function doEditItem(cat, id) {
+  const it = S.items[cat].find(i=>i.id===id); if(!it) return;
+  it.name = document.getElementById('f_name').value.trim()||it.name;
+  it.assignee = document.getElementById('f_ass').value.trim();
+  it.freq = document.getElementById('f_freq').value.trim();
+  it.note = document.getElementById('f_note').value.trim();
+  it.sensitive = document.getElementById('f_sens').value==='true';
+  it.updated = todayStr(); it.by = user.name;
+  log('항목 수정', `"${it.name}" (${catLabel(cat)})`, user.name);
+  save(); closeModal(); navigate(cat);
+}
+function deleteItem(cat, id) {
+  const it = S.items[cat].find(i=>i.id===id); if(!it) return;
+  if(!confirm(`"${it.name}" 항목을 삭제하시겠습니까?`)) return;
+  S.items[cat] = S.items[cat].filter(i=>i.id!==id);
+  log('항목 삭제', `"${it.name}" (${catLabel(cat)})`, user.name);
+  save(); navigate(cat);
+}
+function catLabel(cat) { return {purchase:'구매/원자재',production:'생산',quality:'품질',sales:'영업/매출'}[cat]||cat; }
+
+// ================================================================
+// PENDING ITEMS
+// ================================================================
+function addPendingModal() {
+  openModal('추가 예정 항목 등록', `<div class="form-group"><label class="form-label">항목명</label><input class="form-control" id="f_p" placeholder="예: 재고 현황"/></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">취소</button>
+     <button class="btn btn-primary" onclick="doAddPending()">추가</button>`);
+}
+function doAddPending() {
+  const t = document.getElementById('f_p').value.trim(); if(!t) return;
+  S.pending.push(t); log('추가 예정 등록', t, user.name); save(); closeModal(); renderDashboard();
+}
+function deletePending(i) {
+  if(!confirm(`"${S.pending[i]}"을 제거하시겠습니까?`)) return;
+  const t=S.pending[i]; S.pending.splice(i,1); log('추가 예정 제거', t, user.name); save(); renderDashboard();
+}
+function movePending(i) {
+  const item = S.pending[i];
+  openModal('항목으로 등록', `
+    <div class="alert alert-info"><strong>"${item}"</strong>을 관리 항목으로 추가합니다.</div>
+    <div class="form-group"><label class="form-label">카테고리</label><select class="form-control" id="f_cat"><option value="purchase">구매 / 원자재</option><option value="production">생산</option><option value="quality">품질</option><option value="sales">영업 / 매출</option></select></div>
+    <div class="form-group"><label class="form-label">담당자</label><input class="form-control" id="f_ass" placeholder="담당자 이름"/></div>
+    <div class="form-group"><label class="form-label">업데이트 주기</label><input class="form-control" id="f_freq" placeholder="예: 월 1회"/></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">취소</button>
+     <button class="btn btn-primary" onclick="doMovePending(${i},'${item.replace(/'/g,"\\\'")}')">확정</button>`);
+}
+function doMovePending(i, name) {
+  const cat=document.getElementById('f_cat').value;
+  S.items[cat].push({id:S.nextId++,name,assignee:document.getElementById('f_ass').value.trim()||'—',freq:document.getElementById('f_freq').value.trim()||'—',note:'',updated:todayStr(),by:user.name,sensitive:false});
+  S.pending.splice(i,1); log('추가 예정 → 항목', `"${name}" → ${catLabel(cat)}`, user.name); save(); closeModal(); renderDashboard();
+}
+
+// ================================================================
+// TEAM MANAGEMENT
+// ================================================================
+function renderTeam() {
+  const ROLE_BADGE = { '관리자':'badge-blue','구매 담당':'badge-green','생산/품질 담당':'badge-yellow','영업 담당':'badge-purple' };
+  const rows = S.team.map(m=>`<tr>
+    <td><div style="display:flex;align-items:center;gap:10px;"><div class="user-avatar" style="width:30px;height:30px;font-size:13px;flex-shrink:0;">${m.name.charAt(0).toUpperCase()}</div>
+      <div><strong>${m.name}</strong><div style="font-size:11px;color:var(--text-light);">${ROLE_VN[m.role]||''}</div></div></div></td>
+    <td><span class="badge ${ROLE_BADGE[m.role]||'badge-gray'}">${tRole(m.role)}</span></td>
+    <td style="font-size:12.5px;color:var(--text-light);">${m.email||'—'}</td>
+    <td style="font-size:12.5px;color:var(--text-light);">${tPerm(m.role)}</td>
+    <td><span style="font-size:13px;letter-spacing:2px;color:var(--text-light);">${'●'.repeat(Math.min((m.pin||'').length,6))}</span></td>
+    <td style="white-space:nowrap;"><button class="btn btn-sm btn-secondary" onclick="editMemberModal(${m.id})">${t('btn_pin')}</button> ${m.role!=='관리자'?`<button class="btn btn-sm btn-danger" onclick="deleteMember(${m.id})">${t('btn_del')}</button>`:''}</td>
+  </tr>`).join('');
+  document.getElementById('mainContent').innerHTML = `
+    <div class="alert alert-info" style="margin-bottom:14px;">${t('team_pin_notice')}</div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><div class="card-title">${t('team')} <span class="badge badge-gray">${S.team.length}${t('lbl_members')}</span></div><button class="btn btn-primary" onclick="addMemberModal()">${t('btn_add_member')}</button></div>
+      <div class="table-wrap"><table><thead><tr><th>${t('col_name')} / Tên</th><th>${t('col_role')} / Vai trò</th><th>${t('col_email')}</th><th>${t('col_perm')}</th><th>${t('col_pin')}</th><th>${t('col_action')}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">${t('perm_title')}</div></div>
+      <div style="padding:16px 20px;font-size:13.5px;line-height:2;color:var(--text-light);">
+        <p>• <strong style="color:var(--text);">${t('perm1')}</strong></p>
+        <p>• <strong style="color:var(--text);">${t('perm2')}</strong></p>
+        <p>• <strong style="color:var(--text);">${t('perm3')}</strong></p>
+        <p>• <strong style="color:var(--text);">${t('perm4')}</strong></p>
+      </div>
+    </div>`;
+}
+function addMemberModal() {
+  openModal('팀원 추가 / Thêm nhân viên', `
+    <div class="form-group"><label class="form-label">이름 * <span style="font-size:11px;color:var(--text-light);">/ Họ và tên</span></label><input class="form-control" id="f_name" placeholder="이름 입력"/></div>
+    <div class="form-group"><label class="form-label">역할 <span style="font-size:11px;color:var(--text-light);">/ Vai trò</span></label>
+      <select class="form-control" id="f_role">
+        <option value="구매 담당">구매 담당 / Phụ trách mua hàng</option>
+        <option value="생산/품질 담당">생산/품질 담당 / Phụ trách sản xuất/CL</option>
+        <option value="영업 담당">영업 담당 / Phụ trách kinh doanh</option>
+        <option value="관리자">관리자 / Quản lý</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">이메일 (선택)</label><input class="form-control" id="f_email" placeholder="example@senecokr.com"/></div>
+    <div class="form-group"><label class="form-label">초기 PIN * <span style="font-size:11px;color:var(--text-light);">/ Mã PIN ban đầu</span></label><input class="form-control" id="f_pin" placeholder="숫자 4자리 권장" maxlength="20"/></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">취소</button><button class="btn btn-primary" onclick="doAddMember()">추가</button>`);
+}
+function doAddMember() {
+  const name = document.getElementById('f_name').value.trim(); if(!name){alert('이름을 입력하세요');return;}
+  const pin  = document.getElementById('f_pin').value.trim();  if(!pin){alert('PIN을 입력하세요');return;}
+  const m = { id:Date.now(), name, role:document.getElementById('f_role').value, email:document.getElementById('f_email').value.trim(), pin };
+  S.team.push(m); log('팀원 추가',`${name} (${m.role})`,user.name); save(); closeModal();
+  populateLoginDropdown(); renderTeam();
+}
+function editMemberModal(id) {
+  const m = S.team.find(x=>x.id===id); if(!m) return;
+  openModal('팀원 수정 / Chỉnh sửa nhân viên', `
+    <div class="form-group"><label class="form-label">이름 *</label><input class="form-control" id="f_name" value="${esc(m.name)}"/></div>
+    <div class="form-group"><label class="form-label">역할 / Vai trò</label>
+      <select class="form-control" id="f_role">
+        <option value="구매 담당"${m.role==='구매 담당'?' selected':''}>구매 담당 / Phụ trách mua hàng</option>
+        <option value="생산/품질 담당"${m.role==='생산/품질 담당'?' selected':''}>생산/품질 담당 / Phụ trách sản xuất/CL</option>
+        <option value="영업 담당"${m.role==='영업 담당'?' selected':''}>영업 담당 / Phụ trách kinh doanh</option>
+        <option value="관리자"${m.role==='관리자'?' selected':''}>관리자 / Quản lý</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">이메일</label><input class="form-control" id="f_email" value="${esc(m.email)}"/></div>
+    <div class="form-group">
+      <label class="form-label">PIN 변경 <span style="font-size:11px;color:var(--text-light);">/ Đổi mã PIN (공백이면 기존 유지)</span></label>
+      <input class="form-control" id="f_pin" placeholder="새 PIN 입력 (변경 시만)" maxlength="20"/>
+    </div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">취소</button><button class="btn btn-primary" onclick="doEditMember(${id})">저장</button>`);
+}
+function doEditMember(id) {
+  const m = S.team.find(x=>x.id===id); if(!m) return;
+  m.name  = document.getElementById('f_name').value.trim() || m.name;
+  m.role  = document.getElementById('f_role').value;
+  m.email = document.getElementById('f_email').value.trim();
+  const newPin = document.getElementById('f_pin').value.trim();
+  if (newPin) m.pin = newPin;
+  log('팀원 수정',`${m.name} (${m.role})`,user.name); save(); closeModal();
+  populateLoginDropdown(); renderTeam();
+}
+function deleteMember(id) {
+  const m=S.team.find(x=>x.id===id); if(!m) return;
+  if(!confirm(`"${m.name}" 팀원을 삭제하시겠습니까?`)) return;
+  S.team=S.team.filter(x=>x.id!==id); log('팀원 삭제',m.name,user.name); save(); renderTeam();
+}
+
+// ================================================================
+// ROADMAP
+// ================================================================
+function renderRoadmap() {
+  const phases=[
+    {key:'phase1',title:t('phase1'),color:'#2563eb'},
+    {key:'phase2',title:t('phase2'),color:'#d97706'},
+    {key:'phase3',title:t('phase3'),color:'#16a34a'},
+  ];
+  const all=[...S.roadmap.phase1,...S.roadmap.phase2,...S.roadmap.phase3];
+  const done=all.filter(i=>i.done).length;
+  const pct=Math.round(done/all.length*100);
+  const phHTML=phases.map(p=>{
+    const its=S.roadmap[p.key];
+    const d=its.filter(i=>i.done).length;
+    return `<div class="roadmap-phase">
+      <div class="roadmap-phase-title"><span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block;"></span>${p.title}<span class="badge badge-gray">${d}/${its.length}</span></div>
+      ${its.map((it,i)=>`<div class="roadmap-item${it.done?' done':''}" onclick="toggleRoadmap('${p.key}',${i})">
+        <div class="roadmap-check">${it.done?'✓':''}</div>
+        <span class="roadmap-text">${it.text}</span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+  document.getElementById('mainContent').innerHTML = `
+    <div class="card" style="margin-bottom:16px;"><div style="padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-weight:600;">${t('roadmap_overall')}</span><span style="font-weight:700;color:var(--primary);">${pct}% (${done}/${all.length})</span></div>
+      <div class="progress-bar" style="height:10px;"><div class="progress-fill" style="width:${pct}%;"></div></div>
+    </div></div>
+    <div class="card"><div class="card-header"><div class="card-title">${t('roadmap_title')}</div><span style="font-size:12px;color:var(--text-light);">${t('roadmap_hint')}</span></div><div style="padding:20px;">${phHTML}</div></div>`;
+}
+function toggleRoadmap(phase, i) {
+  S.roadmap[phase][i].done=!S.roadmap[phase][i].done;
+  const it=S.roadmap[phase][i];
+  log(it.done?'로드맵 완료':'로드맵 미완료',it.text,user.name);
+  save(); renderRoadmap();
+}
+
+// ================================================================
+// HISTORY
+// ================================================================
+function renderHistory() {
+  const rows=[...S.history].reverse().map(h=>`<tr>
+    <td style="font-size:12px;color:var(--text-light);white-space:nowrap;">${h.date}</td>
+    <td><span class="badge badge-gray">${tAction(h.action)}</span></td>
+    <td style="font-size:13px;">${h.detail}</td>
+    <td style="font-size:12px;color:var(--text-light);">${h.author}</td>
+  </tr>`).join('');
+  document.getElementById('mainContent').innerHTML = `
+    <div class="card">
+      <div class="card-header"><div class="card-title">${t('history')} <span class="badge badge-gray">${S.history.length}건</span></div>${isAdmin()?`<button class="btn btn-sm btn-danger" onclick="clearHistory()">${t('btn_clear')}</button>`:''}</div>
+      <div class="table-wrap"><table><thead><tr><th>${t('hist_col_date')}</th><th>${t('hist_col_type')}</th><th>${t('hist_col_detail')}</th><th>${t('hist_col_author')}</th></tr></thead><tbody>${rows||`<tr><td colspan="4"><div class="empty-state"><p>${t('msg_no_data')}</p></div></td></tr>`}</tbody></table></div>
+    </div>`;
+}
+function clearHistory() {
+  if(!confirm('변경 이력을 초기화하시겠습니까?')) return;
+  S.history=[{date:todayStr(),action:'이력 초기화',detail:'관리자에 의해 초기화됨',author:user.name}];
+  save(); renderHistory();
+}
+
+// ================================================================
+// MODAL HELPERS
+// ================================================================
+function openModal(title, body, footer) {
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').innerHTML=body;
+  document.getElementById('modalFooter').innerHTML=footer;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function overlayClick(e) { if(e.target===document.getElementById('modalOverlay')) closeModal(); }
+
+// ================================================================
+// UTILITIES
+// ================================================================
+function log(action, detail, author) { S.history.push({date:todayStr(),action,detail,author}); }
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// 초기 실행
+populateLoginDropdown();
+// 저장된 언어 버튼 상태 복원
+['langKo','langBi','langVn'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+document.getElementById({ko:'langKo',bi:'langBi',vn:'langVn'}[curLang])?.classList.add('active');
+</script>
+</body>
+</html>
