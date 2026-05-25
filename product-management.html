@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENECO 제품 관리 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --yellow: #FFD700;
+    --yellow-dark: #E6C200;
+    --yellow-light: #FFF8D0;
+    --gray-bg: #f5f5f5;
+    --border: #ddd;
+    --text: #333;
+    --red: #e74c3c;
+    --green: #27ae60;
+    --blue: #2980b9;
+    --white: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: var(--gray-bg); color: var(--text); font-size: 13px; }
+
+  /* Header */
+  .header {
+    background: #222;
+    color: white;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+  .header h1 span { color: var(--yellow); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .mode-badge {
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    background: #555; color: #ccc;
+  }
+  .mode-badge.admin { background: var(--yellow); color: #222; }
+  #adminBtn {
+    padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 600;
+    background: var(--yellow); color: #222;
+    transition: background 0.2s;
+  }
+  #adminBtn:hover { background: var(--yellow-dark); }
+  #adminBtn.logout { background: #555; color: white; }
+  #adminBtn.logout:hover { background: #444; }
+
+  /* Toolbar */
+  .toolbar {
+    background: white;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .toolbar input[type="text"] {
+    padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; width: 220px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .toolbar input[type="text"]:focus { border-color: var(--yellow-dark); }
+  .toolbar select {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; background: white; outline: none; cursor: pointer;
+  }
+  .toolbar select:focus { border-color: var(--yellow-dark); }
+  .toolbar-spacer { flex: 1; }
+  .btn {
+    padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+  }
+  .btn-yellow { background: var(--yellow); color: #222; }
+  .btn-yellow:hover { background: var(--yellow-dark); }
+  .btn-green { background: var(--green); color: white; }
+  .btn-green:hover { background: #229954; }
+  .btn-gray { background: #e0e0e0; color: #555; }
+  .btn-gray:hover { background: #ccc; }
+  .btn-red { background: var(--red); color: white; }
+  .btn-red:hover { background: #c0392b; }
+  .btn-blue { background: var(--blue); color: white; }
+  .btn-blue:hover { background: #2471a3; }
+  .count-badge {
+    background: var(--yellow-light); color: #555;
+    border: 1px solid var(--yellow-dark);
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  }
+
+  /* Table */
+  .table-wrap {
+    padding: 18px 24px;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%; border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+  }
+  thead tr { background: var(--yellow); }
+  thead th {
+    padding: 10px 10px; text-align: center; font-weight: 700; font-size: 12px;
+    border-right: 1px solid rgba(0,0,0,0.08); white-space: nowrap;
+    cursor: pointer; user-select: none;
+  }
+  thead th:hover { background: var(--yellow-dark); }
+  thead th .sort-icon { opacity: 0.5; margin-left: 3px; }
+  thead th.sorted .sort-icon { opacity: 1; }
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+  tbody tr:hover { background: var(--yellow-light); }
+  tbody td {
+    padding: 9px 10px; text-align: center; vertical-align: middle;
+    border-right: 1px solid #f5f5f5; font-size: 12px;
+  }
+  tbody td.left { text-align: left; }
+  .new-code { font-weight: 700; color: #1a1a1a; font-size: 12px; }
+  .old-code { color: #777; font-size: 11px; }
+  .product-img {
+    width: 52px; height: 42px; object-fit: contain;
+    border-radius: 4px; border: 1px solid #eee;
+    background: #fafafa; cursor: pointer;
+  }
+  .no-img {
+    width: 52px; height: 42px;
+    border: 1px dashed #ccc; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    color: #bbb; font-size: 9px;
+    background: #fafafa;
+  }
+  .action-btns { display: flex; gap: 4px; justify-content: center; }
+  .action-btns button {
+    padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer;
+    font-size: 11px; font-weight: 600; transition: all 0.15s;
+  }
+  .btn-edit { background: #e8f4fd; color: var(--blue); }
+  .btn-edit:hover { background: var(--blue); color: white; }
+  .btn-del { background: #fdecea; color: var(--red); }
+  .btn-del:hover { background: var(--red); color: white; }
+  .no-data { text-align: center; padding: 50px; color: #aaa; font-size: 14px; }
+
+  /* Modal Overlay */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: white; border-radius: 12px;
+    padding: 28px 32px; width: 560px; max-width: 95vw; max-height: 90vh;
+    overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    position: relative;
+  }
+  .modal h2 { font-size: 17px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--yellow); }
+  .modal-close {
+    position: absolute; top: 16px; right: 20px;
+    background: none; border: none; font-size: 22px; cursor: pointer; color: #999;
+    line-height: 1;
+  }
+  .modal-close:hover { color: #333; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 600; color: #555; }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; outline: none; font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--yellow-dark);
+  }
+  .size-row { display: flex; gap: 8px; }
+  .size-row input { flex: 1; }
+  .img-preview-wrap { display: flex; align-items: center; gap: 12px; }
+  .img-preview {
+    width: 80px; height: 65px; object-fit: contain;
+    border: 1px solid #eee; border-radius: 6px; background: #fafafa;
+  }
+  .img-placeholder {
+    width: 80px; height: 65px;
+    border: 1px dashed #ccc; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: #bbb; font-size: 10px; background: #fafafa; text-align: center;
+    line-height: 1.4;
+  }
+  .img-upload-label {
+    padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 600; color: #555;
+    background: #f9f9f9; transition: all 0.2s; display: inline-block;
+  }
+  .img-upload-label:hover { background: #eee; }
+  .img-clear-btn {
+    padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer;
+    font-size: 11px; background: #fdecea; color: var(--red);
+  }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; padding-top: 16px; border-top: 1px solid #eee; }
+
+  /* Password Modal */
+  .pwd-modal { width: 340px; }
+  .pwd-modal input {
+    width: 100%; padding: 10px 14px; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 6px; outline: none;
+    margin-bottom: 6px;
+  }
+  .pwd-modal input:focus { border-color: var(--yellow-dark); }
+  .pwd-error { color: var(--red); font-size: 12px; min-height: 18px; margin-bottom: 12px; }
+
+  /* Image zoom modal */
+  .img-zoom-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); z-index: 2000;
+    align-items: center; justify-content: center; cursor: pointer;
+  }
+  .img-zoom-overlay.active { display: flex; }
+  .img-zoom-overlay img { max-width: 80vw; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .toolbar { gap: 7px; }
+    .toolbar input[type="text"] { width: 160px; }
+    .table-wrap { padding: 10px; }
+    .modal { padding: 20px; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1><span>SENECO</span> 제품 관리 시스템</h1>
+  <div class="header-right">
+    <span class="mode-badge" id="modeBadge">열람 모드</span>
+    <button id="adminBtn" onclick="toggleAdmin()">🔐 관리자 로그인</button>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="🔍  코드, 제품명으로 검색..." oninput="renderTable()">
+  <select id="filterMaterial" onchange="renderTable()">
+    <option value="">원자재 전체</option>
+  </select>
+  <select id="filterPacking" onchange="renderTable()">
+    <option value="">포장방식 전체</option>
+  </select>
+  <button class="btn btn-gray" onclick="resetFilters()">초기화</button>
+  <span class="count-badge" id="countBadge">0 개</span>
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-green" onclick="exportExcel()">📥 엑셀 다운로드</button>
+  <label class="btn btn-blue" id="importBtn" for="excelFileInput" style="display:none; cursor:pointer;">📂 엑셀 가져오기</label>
+  <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleExcelImport(event)">
+  <button class="btn btn-yellow" id="addBtn" onclick="openAdd()" style="display:none;">＋ 제품 추가</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table id="productTable">
+    <thead>
+      <tr>
+        <th onclick="sortBy('newCode')">신규 코드<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('oldCode')">구 코드<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('vnName')">베트남명<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('koName')">한국명<span class="sort-icon">↕</span></th>
+        <th>이미지</th>
+        <th onclick="sortBy('material')">원자재<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('surface')">표면처리<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('packing')">포장방식<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('thick')">두께(T)<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('width')">폭(W)<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('length')">길이(L)<span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('remark')">REMARK<span class="sort-icon">↕</span></th>
+        <th id="actionCol" style="display:none;">관리</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<!-- Password Modal -->
+<div class="modal-overlay" id="pwdModal">
+  <div class="modal pwd-modal">
+    <button class="modal-close" onclick="closeModal('pwdModal')">×</button>
+    <h2>🔐 관리자 로그인</h2>
+    <input type="password" id="pwdInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')checkPwd()">
+    <div class="pwd-error" id="pwdError"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-gray" onclick="closeModal('pwdModal')">취소</button>
+      <button class="btn btn-yellow" onclick="checkPwd()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Product Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    <h2 id="editModalTitle">제품 추가</h2>
+    <input type="hidden" id="editIdx">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>신규 코드 *</label>
+        <input type="text" id="f_newCode" placeholder="KW-01-0001-OL">
+      </div>
+      <div class="form-group">
+        <label>구 코드</label>
+        <input type="text" id="f_oldCode" placeholder="ECO.P18-270">
+      </div>
+      <div class="form-group">
+        <label>베트남명</label>
+        <input type="text" id="f_vnName" placeholder="Cutting board...">
+      </div>
+      <div class="form-group">
+        <label>한국명</label>
+        <input type="text" id="f_koName" placeholder="도마 18T원형-핸들-270">
+      </div>
+      <div class="form-group">
+        <label>원자재</label>
+        <input type="text" id="f_material" placeholder="마호가니(xa cu)">
+      </div>
+      <div class="form-group">
+        <label>표면처리</label>
+        <input type="text" id="f_surface" placeholder="미네랄(Mineral oil 2len)">
+      </div>
+      <div class="form-group">
+        <label>포장방식</label>
+        <input type="text" id="f_packing" placeholder="진공포장(VACUUM)">
+      </div>
+      <div class="form-group">
+        <label>제품 SIZE (mm)</label>
+        <div class="size-row">
+          <input type="number" id="f_thick" placeholder="두께(T)">
+          <input type="number" id="f_width" placeholder="폭(W)">
+          <input type="number" id="f_length" placeholder="길이(L)">
+        </div>
+      </div>
+      <div class="form-group full">
+        <label>REMARK</label>
+        <textarea id="f_remark" placeholder="비고 사항을 입력하세요..." rows="2" style="resize:vertical;"></textarea>
+      </div>
+      <div class="form-group full">
+        <label>이미지</label>
+        <div class="img-preview-wrap">
+          <div id="imgPreviewWrap">
+            <div class="img-placeholder" id="imgPlaceholder">이미지 없음</div>
+            <img class="img-preview" id="imgPreview" src="" style="display:none;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label class="img-upload-label" for="imgFileInput">📂 이미지 선택</label>
+            <input type="file" id="imgFileInput" accept="image/*" style="display:none;" onchange="handleImgUpload(event)">
+            <button type="button" class="img-clear-btn" onclick="clearImg()">🗑 이미지 제거</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('editModal')">취소</button>
+      <button class="btn btn-yellow" onclick="saveProduct()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Excel Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal" style="width:780px;">
+    <button class="modal-close" onclick="closeModal('importModal')">×</button>
+    <h2>📂 엑셀 데이터 가져오기</h2>
+
+    <!-- Step 1: Column Mapping -->
+    <div id="importStep1">
+      <p style="font-size:12px;color:#666;margin-bottom:14px;">
+        업로드된 엑셀의 열(컬럼)과 시스템 항목을 맞춰주세요. 없는 열은 <b>사용 안 함</b>으로 두면 됩니다.
+      </p>
+      <div id="mappingGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+      <div style="display:flex;align-items:center;gap:16px;padding:12px;background:#f9f9f9;border-radius:8px;border:1px solid #eee;margin-bottom:14px;">
+        <span style="font-size:12px;font-weight:600;color:#555;">가져오기 방식:</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="radio" name="importMode" value="append" checked> 기존 데이터에 추가
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="radio" name="importMode" value="replace"> 기존 데이터 전체 교체
+        </label>
+      </div>
+      <div style="background:#fff8d0;border:1px solid #e6c200;border-radius:6px;padding:10px 14px;font-size:12px;color:#555;margin-bottom:14px;">
+        ⚠️ <b>전체 교체</b>를 선택하면 현재 저장된 모든 제품이 삭제되고 엑셀 데이터로 대체됩니다.
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span id="importRowCount" style="font-size:12px;color:#888;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-gray" onclick="closeModal('importModal')">취소</button>
+          <button class="btn btn-yellow" onclick="previewImport()">다음 → 미리보기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Preview -->
+    <div id="importStep2" style="display:none;">
+      <p style="font-size:12px;color:#666;margin-bottom:10px;">
+        아래 데이터가 가져와집니다. 확인 후 <b>가져오기 실행</b>을 눌러주세요.
+      </p>
+      <div style="overflow:auto;max-height:320px;border:1px solid #eee;border-radius:6px;">
+        <table style="width:100%;font-size:11px;border-collapse:collapse;">
+          <thead id="previewHead" style="background:var(--yellow);position:sticky;top:0;"></thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
+        <span id="previewCount" style="font-size:12px;color:#555;font-weight:600;"></span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-gray" onclick="backToMapping()">← 다시 매핑</button>
+          <button class="btn btn-green" onclick="executeImport()">✅ 가져오기 실행</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Zoom -->
+<div class="img-zoom-overlay" id="imgZoom" onclick="closeZoom()">
+  <img id="imgZoomImg" src="">
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = 'seneco2024';
+const STORAGE_KEY = 'seneco_products_v1';
+
+const defaultProducts = [
+  { id:1, newCode:'KW-01-0001-OL', oldCode:'ECO.P18-270',    vnName:'Cutting board ECO.P18-270',    koName:'도마 18T원형-핸들-270', material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:270, length:340, img:'', remark:'' },
+  { id:2, newCode:'KW-01-0002-OL', oldCode:'ECO.P18-300',    vnName:'Cutting board ECO.P18-300',    koName:'도마 18T원형-핸들-300', material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:300, length:370, img:'', remark:'' },
+  { id:3, newCode:'KW-01-0003-OL', oldCode:'ECO.P18-330',    vnName:'Cutting board ECO.P18-330',    koName:'도마 18T원형-핸들-330', material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:330, length:400, img:'', remark:'' },
+  { id:4, newCode:'KW-01-0004-OL', oldCode:'ECO.P18-190-60', vnName:'Cutting board ECO.P18-190-60', koName:'도마 18T사각-핸들-190', material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:140, length:250, img:'', remark:'' },
+  { id:5, newCode:'KW-01-0005-OL', oldCode:'ECO.P18-150',    vnName:'Cutting board ECO.P18-150',    koName:'도마 18T원형-150',      material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:150, length:150, img:'', remark:'' },
+  { id:6, newCode:'KW-01-0006-OL', oldCode:'ECO.P18-165',    vnName:'Cutting board ECO.P18-165',    koName:'도마 18T원형-165',      material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:165, length:165, img:'', remark:'' },
+  { id:7, newCode:'KW-01-0007-OL', oldCode:'ECO.P18-180',    vnName:'Cutting board ECO.P18-180',    koName:'도마 18T원형-180',      material:'마호가니(xa cu)', surface:'미네랄(Mineral oil 2len)', packing:'진공포장(VACUUM)', thick:18, width:180, length:180, img:'', remark:'' },
+];
+
+let products = [];
+let isAdmin = false;
+let sortKey = 'newCode';
+let sortAsc = true;
+let nextId = 100;
+
+// ─── INIT ────────────────────────────────────────────────────────────
+function loadData() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      products = parsed.products || defaultProducts;
+      nextId = parsed.nextId || (Math.max(...products.map(p=>p.id)) + 1);
+    } catch(e) { products = [...defaultProducts]; }
+  } else {
+    products = [...defaultProducts];
+  }
+}
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ products, nextId }));
+}
+
+function buildFilters() {
+  const mats = [...new Set(products.map(p=>p.material).filter(Boolean))].sort();
+  const packs = [...new Set(products.map(p=>p.packing).filter(Boolean))].sort();
+  const mSel = document.getElementById('filterMaterial');
+  const pSel = document.getElementById('filterPacking');
+  const mVal = mSel.value, pVal = pSel.value;
+  mSel.innerHTML = '<option value="">원자재 전체</option>' + mats.map(m=>`<option value="${m}">${m}</option>`).join('');
+  pSel.innerHTML = '<option value="">포장방식 전체</option>' + packs.map(p=>`<option value="${p}">${p}</option>`).join('');
+  mSel.value = mVal; pSel.value = pVal;
+}
+
+// ─── RENDER TABLE ─────────────────────────────────────────────────────
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const mat = document.getElementById('filterMaterial').value;
+  const pack = document.getElementById('filterPacking').value;
+  return products.filter(p => {
+    const matchQ = !q || [p.newCode,p.oldCode,p.vnName,p.koName].some(v=>v&&v.toLowerCase().includes(q));
+    const matchM = !mat || p.material === mat;
+    const matchP = !pack || p.packing === pack;
+    return matchQ && matchM && matchP;
+  });
+}
+
+function renderTable() {
+  const filtered = getFiltered().slice().sort((a,b)=>{
+    let va = a[sortKey]||'', vb = b[sortKey]||'';
+    if (typeof va === 'number') return sortAsc ? va-vb : vb-va;
+    return sortAsc ? String(va).localeCompare(String(vb),'ko') : String(vb).localeCompare(String(va),'ko');
+  });
+  document.getElementById('countBadge').textContent = `${filtered.length} 개`;
+  const tbody = document.getElementById('tableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="13" class="no-data">검색 결과가 없습니다.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(p => `
+    <tr>
+      <td class="new-code">${esc(p.newCode)}</td>
+      <td class="old-code">${esc(p.oldCode)}</td>
+      <td class="left">${esc(p.vnName)}</td>
+      <td class="left">${esc(p.koName)}</td>
+      <td>${p.img
+        ? `<img class="product-img" src="${p.img}" alt="이미지" onclick="zoomImg('${p.img}')">`
+        : `<div class="no-img">이미지<br>없음</div>`}</td>
+      <td>${esc(p.material)}</td>
+      <td>${esc(p.surface)}</td>
+      <td>${esc(p.packing)}</td>
+      <td>${p.thick||'-'}</td>
+      <td>${p.width||'-'}</td>
+      <td>${p.length||'-'}</td>
+      <td class="left">${esc(p.remark)}</td>
+      <td style="display:${isAdmin?'table-cell':'none'};">
+        <div class="action-btns">
+          <button class="btn-edit" onclick="openEdit(${p.id})">✏️ 수정</button>
+          <button class="btn-del" onclick="deleteProduct(${p.id})">🗑 삭제</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function esc(s){ return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  renderTable();
+}
+
+function resetFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterMaterial').value = '';
+  document.getElementById('filterPacking').value = '';
+  renderTable();
+}
+
+// ─── MODAL ─────────────────────────────────────────────────────────────
+function openModal(id) {
+  const el = document.getElementById(id);
+  el.style.display = 'flex';
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  el.style.display = 'none';
+}
+
+// ─── ADMIN ─────────────────────────────────────────────────────────────
+function toggleAdmin() {
+  if (isAdmin) {
+    isAdmin = false;
+    updateAdminUI();
+  } else {
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdError').textContent = '';
+    const modal = document.getElementById('pwdModal');
+    modal.style.display = 'flex';
+    setTimeout(()=>document.getElementById('pwdInput').focus(), 100);
+  }
+}
+function checkPwd() {
+  const v = document.getElementById('pwdInput').value;
+  if (v === ADMIN_PASSWORD) {
+    isAdmin = true;
+    closeModal('pwdModal');
+    updateAdminUI();
+  } else {
+    document.getElementById('pwdError').textContent = '비밀번호가 올바르지 않습니다.';
+    document.getElementById('pwdInput').select();
+  }
+}
+function updateAdminUI() {
+  document.getElementById('modeBadge').textContent = isAdmin ? '관리자 모드' : '열람 모드';
+  document.getElementById('modeBadge').className = 'mode-badge' + (isAdmin ? ' admin' : '');
+  document.getElementById('adminBtn').textContent = isAdmin ? '🔓 로그아웃' : '🔐 관리자 로그인';
+  document.getElementById('adminBtn').className = isAdmin ? 'logout' : '';
+  document.getElementById('addBtn').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('importBtn').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('actionCol').style.display = isAdmin ? 'table-cell' : 'none';
+  renderTable();
+}
+
+// ─── ADD / EDIT ─────────────────────────────────────────────────────────
+let currentImg = '';
+function openAdd() {
+  document.getElementById('editModalTitle').textContent = '➕ 제품 추가';
+  document.getElementById('editIdx').value = '';
+  ['newCode','oldCode','vnName','koName','material','surface','packing','thick','width','length','remark'].forEach(f=>document.getElementById('f_'+f).value='');
+  currentImg = '';
+  updateImgPreview('');
+  openModal('editModal');
+}
+function openEdit(id) {
+  const p = products.find(x=>x.id===id);
+  if (!p) return;
+  document.getElementById('editModalTitle').textContent = '✏️ 제품 수정';
+  document.getElementById('editIdx').value = id;
+  document.getElementById('f_newCode').value = p.newCode||'';
+  document.getElementById('f_oldCode').value = p.oldCode||'';
+  document.getElementById('f_vnName').value = p.vnName||'';
+  document.getElementById('f_koName').value = p.koName||'';
+  document.getElementById('f_material').value = p.material||'';
+  document.getElementById('f_surface').value = p.surface||'';
+  document.getElementById('f_packing').value  = p.packing||'';
+  document.getElementById('f_thick').value    = p.thick||'';
+  document.getElementById('f_width').value    = p.width||'';
+  document.getElementById('f_length').value   = p.length||'';
+  document.getElementById('f_remark').value   = p.remark||'';
+  currentImg = p.img||'';
+  updateImgPreview(currentImg);
+  openModal('editModal');
+}
+
+function saveProduct() {
+  const newCode = document.getElementById('f_newCode').value.trim();
+  if (!newCode) { alert('신규 코드를 입력하세요.'); return; }
+  const id = document.getElementById('editIdx').value;
+  const prod = {
+    newCode,
+    oldCode:   document.getElementById('f_oldCode').value.trim(),
+    vnName:    document.getElementById('f_vnName').value.trim(),
+    koName:    document.getElementById('f_koName').value.trim(),
+    material:  document.getElementById('f_material').value.trim(),
+    surface:   document.getElementById('f_surface').value.trim(),
+    packing:   document.getElementById('f_packing').value.trim(),
+    thick:     parseFloat(document.getElementById('f_thick').value) || '',
+    width:     parseFloat(document.getElementById('f_width').value) || '',
+    length:    parseFloat(document.getElementById('f_length').value) || '',
+    remark:    document.getElementById('f_remark').value.trim(),
+    img:       currentImg,
+  };
+  if (id) {
+    const idx = products.findIndex(p => p.id == id);
+    if (idx >= 0) { prod.id = parseInt(id); products[idx] = prod; }
+  } else {
+    prod.id = nextId++;
+    products.push(prod);
+  }
+  saveData(); buildFilters(); renderTable();
+  closeModal('editModal');
+}
+
+function deleteProduct(id) {
+  if (!confirm('이 제품을 삭제하시겠습니까?')) return;
+  products = products.filter(p => p.id !== id);
+  saveData(); buildFilters(); renderTable();
+}
+
+// ─── IMAGE ──────────────────────────────────────────────────────────────
+function updateImgPreview(src) {
+  const el = document.getElementById('imgPreview');
+  if (!el) return;
+  el.innerHTML = src
+    ? `<img src="${src}" style="max-width:200px;max-height:150px;border-radius:6px;display:block;">`
+    : '<span style="color:#aaa;font-size:13px;">이미지 없음</span>';
+}
+function handleImgUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { currentImg = ev.target.result; updateImgPreview(currentImg); };
+  reader.readAsDataURL(file);
+}
+function removeImg() {
+  currentImg = ''; updateImgPreview('');
+  const inp = document.getElementById('imgInput'); if (inp) inp.value = '';
+}
+function zoomImg(src) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out;';
+  ov.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);">`;
+  ov.onclick = () => document.body.removeChild(ov);
+  document.body.appendChild(ov);
+}
+
+// ─── EXPORT ─────────────────────────────────────────────────────────────
+function exportExcel() {
+  const headers = ['신규코드','구코드','베트남어명','한국어명','원자재','표면처리','포장','T','W','L','REMARK'];
+  const rows = products.map(p => [p.newCode,p.oldCode,p.vnName,p.koName,p.material,p.surface,p.packing,p.thick,p.width,p.length,p.remark]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Products');
+  XLSX.writeFile(wb, 'SENECO_제품목록.xlsx');
+}
+
+// ─── IMPORT ─────────────────────────────────────────────────────────────
+let importHeaders = [], importRows = [];
+const COL_FIELDS = [
+  {key:'newCode',label:'신규 코드'},{key:'oldCode',label:'구 코드'},
+  {key:'vnName',label:'베트남어명'},{key:'koName',label:'한국어명'},
+  {key:'material',label:'원자재'},{key:'surface',label:'표면처리'},
+  {key:'packing',label:'포장방식'},{key:'thick',label:'두께(T)'},
+  {key:'width',label:'너비(W)'},{key:'length',label:'길이(L)'},
+  {key:'remark',label:'REMARK'},
+];
+function autoMap(h) {
+  h = h.toLowerCase();
+  if (h.includes('신규')||h==='new code'||(h.includes('코드')&&!h.includes('구'))) return 'newCode';
+  if (h.includes('구코')||h.includes('old')||h.includes('구 코')) return 'oldCode';
+  if (h.includes('vn')||h.includes('베트남')) return 'vnName';
+  if (h.includes('ko')||h.includes('한국')||h.includes('한글')) return 'koName';
+  if (h.includes('material')||h.includes('원자재')) return 'material';
+  if (h.includes('surface')||h.includes('표면')) return 'surface';
+  if (h.includes('pack')||h.includes('포장')) return 'packing';
+  if (h==='t'||h.includes('두께')||h.includes('thick')) return 'thick';
+  if (h==='w'||h.includes('너비')||h.includes('width')||h.includes('폭')) return 'width';
+  if (h==='l'||h.includes('길이')||h.includes('length')) return 'length';
+  if (h.includes('remark')||h.includes('비고')) return 'remark';
+  return '';
+}
+function handleExcelImport(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const data = new Uint8Array(ev.target.result);
+    const wb = XLSX.read(data, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    if (rows.length < 2) { alert('데이터가 없습니다.'); return; }
+    let hr = 0;
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+      if (rows[i].some(c => c && String(c).trim())) { hr = i; break; }
+    }
+    importHeaders = rows[hr].map((h,i) => h ? String(h).trim() : `열${i+1}`);
+    importRows = rows.slice(hr+1).filter(r => r.some(c => c !== ''));
+    buildImportUI();
+    openModal('importModal');
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+}
+function buildImportUI() {
+  const c = document.getElementById('importMappingContainer');
+  if (!c) return;
+  c.innerHTML = `<p style="font-size:13px;color:#666;margin-bottom:10px;">엑셀 열을 시스템 항목에 매핑하세요. (총 ${importRows.length}행)</p>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f5f5f5;"><th style="padding:7px;border:1px solid #ddd;text-align:left;">엑셀 열</th><th style="padding:7px;border:1px solid #ddd;text-align:left;">시스템 항목</th></tr></thead>
+    <tbody>${importHeaders.map((h,i)=>`<tr>
+      <td style="padding:7px;border:1px solid #ddd;">${h}</td>
+      <td style="padding:7px;border:1px solid #ddd;">
+        <select class="import-map-sel" data-col="${i}" style="width:100%;padding:4px;border:1px solid #ddd;border-radius:4px;">
+          <option value="">— 사용 안 함 —</option>
+          ${COL_FIELDS.map(f=>`<option value="${f.key}"${autoMap(h)===f.key?' selected':''}>${f.label}</option>`).join('')}
+        </select>
+      </td></tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+function doImport() {
+  const sels = document.querySelectorAll('.import-map-sel');
+  const mapping = {};
+  sels.forEach(sel => { if (sel.value) mapping[sel.value] = parseInt(sel.dataset.col); });
+  if (mapping.newCode === undefined) { alert('신규 코드 열을 반드시 매핑하세요.'); return; }
+  let added = 0, updated = 0, skipped = 0;
+  importRows.forEach(row => {
+    const newCode = String(row[mapping.newCode]||'').trim();
+    if (!newCode) { skipped++; return; }
+    const existing = products.find(p => p.newCode === newCode);
+    const get = (key, fallback) => mapping[key]!==undefined ? String(row[mapping[key]]||'').trim() : (fallback||'');
+    const getNum = (key, fallback) => mapping[key]!==undefined ? (parseFloat(row[mapping[key]])||'') : (fallback||'');
+    const prod = {
+      id: existing ? existing.id : nextId++,
+      newCode,
+      oldCode:  get('oldCode',  existing?.oldCode),
+      vnName:   get('vnName',   existing?.vnName),
+      koName:   get('koName',   existing?.koName),
+      material: get('material', existing?.material),
+      surface:  get('surface',  existing?.surface),
+      packing:  get('packing',  existing?.packing),
+      thick:    getNum('thick', existing?.thick),
+      width:    getNum('width', existing?.width),
+      length:   getNum('length',existing?.length),
+      remark:   get('remark',   existing?.remark),
+      img:      existing?.img||'',
+    };
+    if (existing) { products[products.indexOf(existing)] = prod; updated++; }
+    else { products.push(prod); added++; }
+  });
+  saveData(); buildFilters(); renderTable(); closeModal('importModal');
+  alert(`완료: ${added}개 추가, ${updated}개 업데이트, ${skipped}개 건너뜀`);
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  buildFilters();
+  renderTable();
+  updateAdminUI();
+});
+</script>
+</body>
+</html>
